@@ -82,6 +82,7 @@ MidiScroomer::on_expose_event(GdkEventExpose* ev)
 			lnote = 127 - (int) floor((double) (clip_rect.y + clip_rect.height) * y2note) - 1;
 			hnote = 127 - (int) floor((double) clip_rect.y * y2note) + 1;
 
+			/*
 			for (int note = lnote; note < hnote + 1; ++note) {
 				double y = height - note * note2y;
 				bool draw = false;
@@ -111,6 +112,7 @@ MidiScroomer::on_expose_event(GdkEventExpose* ev)
 					cc->stroke();
 				}
 			}
+			*/
 
 			if (i == Handle1 || i == Handle2) {
 				cc->rectangle(comp_rect.x + 0.5f, comp_rect.y + 0.5f, comp_rect.width - 1.0f, comp_rect.height - 1.0f);
@@ -121,6 +123,7 @@ MidiScroomer::on_expose_event(GdkEventExpose* ev)
 
 			cc->reset_clip();
 		}
+
 	}
 
 	return true;

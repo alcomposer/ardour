@@ -174,118 +174,55 @@ render_dga(Cairo::RefPtr<Cairo::Context> cr, int /*note*/, double x[], double y[
 }
 
 void
-PianoRollHeader::get_path(PianoRollHeader::ItemType note_type, int note, double x[], double y[])
+PianoRollHeader::get_path(int note, double x[], double y[])
 {
-	double y_pos = floor(_view.note_to_y(note)) + 1.5f;
+	double y_pos = floor(_view.note_to_y(note)) + 1.f;
 	double note_height;
-	double other_y1 = floor(_view.note_to_y(note+1)) + floor(_note_height / 2.0f) + 2.5f;
-	double other_y2 = floor(_view.note_to_y(note-1)) + floor(_note_height / 2.0f) + 1.0f;
+	//double other_y1 = floor(_view.note_to_y(note+1)) + floor(_note_height / 2.0f) + 2.5f;
+	//double other_y2 = floor(_view.note_to_y(note-1)) + floor(_note_height / 2.0f) + 1.0f;
 	double width = get_width();
 
 	if (note == 0) {
-		note_height = floor(_view.contents_height()) - y_pos + 2.;
+		note_height = floor(_view.contents_height()) - y_pos;
 	} else {
-		note_height = floor(_view.note_to_y(note - 1)) - y_pos + 2.;
+		note_height = floor(_view.note_to_y(note - 1)) - y_pos;
 	}
 
-	switch (note_type) {
+	/*switch (note_type) {
 	case BLACK_SEPARATOR:
-		x[0] = 1.5f;
-		y[0] = y_pos;
-		x[1] = _black_note_width;
-		y[1] = y_pos;
-		break;
 	case BLACK_MIDDLE_SEPARATOR:
-		x[0] = _black_note_width;
-		y[0] = y_pos + floor(_note_height / 2.0f);
-		x[1] = width - 1.0f;
-		y[1] = y[0];
-		break;
 	case BLACK:
-		x[0] = 1.5f;
-		y[0] = y_pos + note_height - 0.5f;
-		x[1] = 1.5f;
-		y[1] = y_pos + 1.0f;
-		x[2] = _black_note_width;
-		y[2] = y_pos + 1.0f;
-		x[3] = _black_note_width;
-		y[3] = y_pos + note_height - 0.5f;
-		x[4] = 1.5f;
-		y[4] = y_pos + note_height - 0.5f;
+		x[0] = 2.0f;
+		y[0] = y_pos + note_height;
+		x[1] = 2.0f;
+		y[1] = y_pos;
+		x[2] = width;
+		y[2] = y_pos;
+		x[3] = width;
+		y[3] = y_pos + note_height;
+		x[4] = 2.0f;
+		y[4] = y_pos + note_height;
 		return;
 	case WHITE_SEPARATOR:
-		x[0] = 1.5f;
-		y[0] = y_pos;
-		x[1] = width - 1.5f;
-		y[1] = y_pos;
-		break;
-	case WHITE_RECT:
-		x[0] = 1.5f;
-		y[0] = y_pos + note_height - 0.5f;
-		x[1] = 1.5f;
-		y[1] = y_pos + 1.0f;
-		x[2] = width - 1.5f;
-		y[2] = y_pos + 1.0f;
-		x[3] = width - 1.5f;
-		y[3] = y_pos + note_height - 0.5f;
-		x[4] = 1.5f;
-		y[4] = y_pos + note_height - 0.5f;
-		return;
 	case WHITE_CF:
-		x[0] = 1.5f;
-		y[0] = y_pos + note_height - 1.5f;
-		x[1] = 1.5f;
-		y[1] = y_pos + 1.0f;
-		x[2] = _black_note_width + 1.0f;
-		y[2] = y_pos + 1.0f;
-		x[3] = _black_note_width + 1.0f;
-		y[3] = other_y1;
-		x[4] = width - 1.5f;
-		y[4] = other_y1;
-		x[5] = width - 1.5f;
-		y[5] = y_pos + note_height - 1.5f;
-		x[6] = 1.5f;
-		y[6] = y_pos + note_height - 1.5f;
-		return;
 	case WHITE_EB:
-		x[0] = 1.5f;
-		y[0] = y_pos + note_height - 1.5f;
-		x[1] = 1.5f;
-		y[1] = y_pos + 1.0f;
-		x[2] = width - 1.5f;
-		y[2] = y_pos + 1.0f;
-		x[3] = width - 1.5f;
-		y[3] = other_y2;
-		x[4] = _black_note_width + 1.0f;
-		y[4] = other_y2;
-		x[5] = _black_note_width + 1.0f;
-		y[5] = y_pos + note_height - 1.5f;
-		x[6] = 1.5f;
-		y[6] = y_pos + note_height - 1.5f;
-		return;
 	case WHITE_DGA:
-		x[0] = 1.5f;
-		y[0] = y_pos + note_height - 1.5f;
-		x[1] = 1.5f;
-		y[1] = y_pos + 1.0f;
-		x[2] = _black_note_width + 1.0f;
-		y[2] = y_pos + 1.0f;
-		x[3] = _black_note_width + 1.0f;
-		y[3] = other_y1;
-		x[4] = width - 1.5f;
-		y[4] = other_y1;
-		x[5] = width - 1.5f;
-		y[5] = other_y2;
-		x[6] = _black_note_width + 1.0f;
-		y[6] = other_y2;
-		x[7] = _black_note_width + 1.0f;
-		y[7] = y_pos + note_height - 1.5f;
-		x[8] = 1.5f;
-		y[8] = y_pos + note_height - 1.5f;
+	case WHITE_RECT:
+	*/
+		x[0] = 1.f;
+		y[0] = y_pos + note_height;
+		x[1] = 1.f;
+		y[1] = y_pos;
+		x[2] = width;
+		y[2] = y_pos;
+		x[3] = width;
+		y[3] = y_pos + note_height;
+		x[4] = 1.f;
+		y[4] = y_pos + note_height;
 		return;
-	default:
-		return;
-	}
+	//default:
+	//	return;
+	//}
 }
 
 bool
@@ -301,7 +238,7 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	Color bg, tl_shadow, br_shadow;
 	int oct_rel;
 	int y1 = max(rect.y, 0);
-	int y2 = min(rect.y + rect.height, (int) floor(_view.contents_height() - 1.0f));
+	int y2 = min(rect.y + rect.height, (int) floor(_view.contents_height()));
 
 	//Cairo::TextExtents te;
 	lowest = max(_view.lowest_note(), _view.y_to_note(y2));
@@ -311,7 +248,7 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 		lowest = 0;
 	}
 
-	cr->select_font_face ("Georgia", Cairo::FONT_SLANT_NORMAL, Cairo::FONT_WEIGHT_BOLD);
+	cr->select_font_face ("Roboto", Cairo::FONT_SLANT_NORMAL, Cairo::FONT_WEIGHT_BOLD);
 	font_size = min((double) 10.0f, _note_height - 4.0f);
 	cr->set_font_size(font_size);
 
@@ -326,11 +263,11 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 
 	/* draw vertical lines with shade at both ends of the widget */
 	cr->set_source_rgb(0.0f, 0.0f, 0.0f);
-	cr->move_to(0.5f, rect.y);
-	cr->line_to(0.5f, rect.y + rect.height);
+	cr->move_to(0.f, rect.y);
+	cr->line_to(0.f, rect.y + rect.height);
 	cr->stroke();
-	cr->move_to(get_width() - 0.5f, rect.y);
-	cr->line_to(get_width() - 0.5f, rect.y + rect.height);
+	cr->move_to(get_width(),rect.y);
+	cr->line_to(get_width(), rect.y + rect.height);
 	cr->stroke();
 
 	//pat->add_color_stop_rgb(0.0, 0.33, 0.33, 0.33);
@@ -364,15 +301,15 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 
 			/* draw black separators */
 			cr->set_source_rgb(0.0f, 0.0f, 0.0f);
-			get_path(BLACK_SEPARATOR, i, x, y);
+			get_path(i, x, y);
 			create_path(cr, x, y, 0, 1);
 			cr->stroke();
 
-			get_path(BLACK_MIDDLE_SEPARATOR, i, x, y);
+			get_path(i, x, y);
 			create_path(cr, x, y, 0, 1);
 			cr->stroke();
 
-			get_path(BLACK, i, x, y);
+			get_path(i, x, y);
 			render_rect(cr, i, x, y, bg, tl_shadow, br_shadow);
 			break;
 
@@ -396,10 +333,10 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 			case 0:
 			case 5:
 				if (i == _view.highest_note()) {
-					get_path(WHITE_RECT, i, x, y);
+					get_path(i, x, y);
 					render_rect(cr, i, x, y, bg, tl_shadow, br_shadow);
 				} else {
-					get_path(WHITE_CF, i, x, y);
+					get_path(i, x, y);
 					render_cf(cr, i, x, y, bg, tl_shadow, br_shadow);
 				}
 				break;
@@ -408,13 +345,13 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 			case 7:
 			case 9:
 				if (i == _view.highest_note()) {
-					get_path(WHITE_EB, i, x, y);
+					get_path(i, x, y);
 					render_eb(cr, i, x, y, bg, tl_shadow, br_shadow);
 				} else if (i == _view.lowest_note()) {
-					get_path(WHITE_CF, i, x, y);
+					get_path(i, x, y);
 					render_cf(cr, i, x, y, bg, tl_shadow, br_shadow);
 				} else {
-					get_path(WHITE_DGA, i, x, y);
+					get_path(i, x, y);
 					render_dga(cr, i, x, y, bg, tl_shadow, br_shadow);
 				}
 				break;
@@ -422,15 +359,15 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 			case 4:
 			case 11:
 				cr->set_source_rgb(0.0f, 0.0f, 0.0f);
-				get_path(WHITE_SEPARATOR, i, x, y);
+				get_path(i, x, y);
 				create_path(cr, x, y, 0, 1);
 				cr->stroke();
 
 				if (i == _view.lowest_note()) {
-					get_path(WHITE_RECT, i, x, y);
+					get_path(i, x, y);
 					render_rect(cr, i, x, y, bg, tl_shadow, br_shadow);
 				} else {
-					get_path(WHITE_EB, i, x, y);
+					get_path(i, x, y);
 					render_eb(cr, i, x, y, bg, tl_shadow, br_shadow);
 				}
 				break;
@@ -673,7 +610,7 @@ PianoRollHeader::on_size_allocate(Gtk::Allocation& a)
 {
 	DrawingArea::on_size_allocate(a);
 
-	_black_note_width = floor(0.7 * get_width()) + 0.5f;
+	_black_note_width = floor(0.7 * get_width());// + 0.5f;
 }
 
 void

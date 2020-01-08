@@ -90,7 +90,7 @@ private:
 
 	void invalidate_note_range(int lowest, int highest);
 
-	void get_path(ItemType, int note, double x[], double y[]);
+	void get_path(int note, double x[], double y[]);
 
 	void send_note_on(uint8_t note);
 	void send_note_off(uint8_t note);
