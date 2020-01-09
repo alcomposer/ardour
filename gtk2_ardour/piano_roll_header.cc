@@ -249,15 +249,6 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 			switch(oct_rel) {
 			case 0:
 			case 5:
-				if (i == _view.highest_note()) {
-					get_path(i, x, y);
-					render_rect(cr, i, x, y, bg, tl_shadow, br_shadow);
-				} else {
-					get_path(i, x, y);
-					render_rect(cr, i, x, y, bg, tl_shadow, br_shadow);
-				}
-				break;
-
 			case 2:
 			case 7:
 			case 9:
@@ -277,16 +268,8 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 			case 11:
 				cr->set_source_rgb(0.0f, 0.0f, 0.0f);
 				get_path(i, x, y);
-				create_path(cr, x, y, 0, 1);
-				cr->stroke();
+				render_rect(cr, i, x, y, bg, tl_shadow, br_shadow);
 
-				if (i == _view.lowest_note()) {
-					get_path(i, x, y);
-					render_rect(cr, i, x, y, bg, tl_shadow, br_shadow);
-				} else {
-					get_path(i, x, y);
-					render_rect(cr, i, x, y, bg, tl_shadow, br_shadow);
-				}
 				break;
 
 			default:
