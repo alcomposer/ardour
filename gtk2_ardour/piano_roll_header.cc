@@ -37,13 +37,9 @@ using namespace Gtkmm2ext;
 
 PianoRollHeader::Color PianoRollHeader::white = PianoRollHeader::Color(0.77f, 0.78f, 0.76f);
 PianoRollHeader::Color PianoRollHeader::white_highlight = PianoRollHeader::Color(1.00f, 0.40f, 0.40f);
-PianoRollHeader::Color PianoRollHeader::white_shade_light = PianoRollHeader::Color(0.95f, 0.95f, 0.95f);
-PianoRollHeader::Color PianoRollHeader::white_shade_dark = PianoRollHeader::Color(0.56f, 0.56f, 0.56f);
 
-PianoRollHeader::Color PianoRollHeader::black = PianoRollHeader::Color(0.24f, 0.24f, 0.24f);
+PianoRollHeader::Color PianoRollHeader::black = PianoRollHeader::Color(0.14f, 0.14f, 0.14f);
 PianoRollHeader::Color PianoRollHeader::black_highlight = PianoRollHeader::Color(0.60f, 0.10f, 0.10f);
-PianoRollHeader::Color PianoRollHeader::black_shade_light = PianoRollHeader::Color(0.46f, 0.46f, 0.46f);
-PianoRollHeader::Color PianoRollHeader::black_shade_dark = PianoRollHeader::Color(0.1f, 0.1f, 0.1f);
 
 PianoRollHeader::Color::Color()
 	: r(1.0f)
@@ -99,7 +95,7 @@ create_path(Cairo::RefPtr<Cairo::Context> cr, double x[], double y[], int start,
 
 inline void
 render_rect(Cairo::RefPtr<Cairo::Context> cr, int /*note*/, double x[], double y[],
-	     PianoRollHeader::Color& bg, PianoRollHeader::Color& tl_shadow, PianoRollHeader::Color& br_shadow)
+	     PianoRollHeader::Color& bg)
 {
 	cr->set_source_rgb(bg.r, bg.g, bg.b);
 	create_path(cr, x, y, 0, 4);
@@ -140,11 +136,11 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	GdkRectangle& rect = ev->area;
 	double font_size;
 	int lowest, highest;
+	PianoRollHeader::Color bg;
 	Cairo::RefPtr<Cairo::Context> cr = get_window()->create_cairo_context();
 	Cairo::RefPtr<Cairo::LinearGradient> pat = Cairo::LinearGradient::create(0, 0, _black_note_width, 0);
 	double x[9];
 	double y[9];
-	Color bg, tl_shadow, br_shadow;
 	int oct_rel;
 	int y1 = max(rect.y, 0);
 	int y2 = min(rect.y + rect.height, (int) floor(_view.contents_height()));
@@ -201,14 +197,6 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 				bg.set(black);
 			}
 
-			if (_active_notes[i]) {
-				tl_shadow.set(black_shade_dark);
-				br_shadow.set(black_shade_light);
-			} else {
-				tl_shadow.set(black_shade_light);
-				br_shadow.set(black_shade_dark);
-			}
-
 			/* draw black separators */
 			cr->set_source_rgb(0.0f, 0.0f, 0.0f);
 			get_path(i, x, y);
@@ -220,7 +208,7 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 			cr->stroke();
 
 			get_path(i, x, y);
-			render_rect(cr, i, x, y, bg, tl_shadow, br_shadow);
+			render_rect(cr, i, x, y, bg);
 			break;
 
 		default:
@@ -231,32 +219,24 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 				bg.set(white);
 			}
 
-			if (_active_notes[i]) {
-				tl_shadow.set(white_shade_dark);
-				br_shadow.set(white_shade_light);
-			} else {
-				tl_shadow.set(white_shade_light);
-				br_shadow.set(white_shade_dark);
-			}
-
-			switch(oct_rel) {
-			case 0:
-			case 5:
-			case 2:
-			case 7:
-			case 9:
-			case 4:
-			case 11:
-				cr->set_source_rgb(0.0f, 0.0f, 0.0f);
-				get_path(i, x, y);
-				render_rect(cr, i, x, y, bg, tl_shadow, br_shadow);
-				break;
-
-			default:
-				break;
-
-			}
+		switch(oct_rel) {
+		case 0:
+		case 5:
+		case 2:
+		case 7:
+		case 9:
+		case 4:
+		case 11:
+			cr->set_source_rgb(0.0f, 0.0f, 0.0f);
+			get_path(i, x, y);
+			render_rect(cr, i, x, y, bg);
 			break;
+
+		default:
+			break;
+
+		}
+		break;
 
 		}
 
