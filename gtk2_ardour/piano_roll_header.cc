@@ -110,12 +110,13 @@ PianoRollHeader::get_path(int note, double x[], double y[])
 {
 	double y_pos = floor(_view.note_to_y(note));
 	double note_height;
+	double raw_note_height = floor(_view.note_to_y(note - 1)) - y_pos;
 	double width = get_width();
 
 	if (note == 0) {
 		note_height = floor(_view.contents_height()) - y_pos;
 	} else {
-		note_height = floor(_view.note_to_y(note - 1)) - y_pos - 1.f;
+		note_height = raw_note_height <= 3? raw_note_height : raw_note_height - 1.f;
 	}
 	x[0] = 1.f;
 	y[0] = y_pos + note_height;
