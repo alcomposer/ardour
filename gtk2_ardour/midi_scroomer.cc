@@ -68,16 +68,20 @@ MidiScroomer::on_expose_event(GdkEventExpose* ev)
 		Component comp = (Component) i;
 		set_comp_rect(comp_rect, comp);
 
-		if (gdk_rectangle_intersect(&comp_rect, &ev->area, &clip_rect)) {
+		//if (gdk_rectangle_intersect(&comp_rect, &ev->area, &clip_rect)) {
+
+
 			get_colors(colors, comp);
 
+			cc->set_source_rgb (1.f,0.f,0.f);//(colors[3], colors[4], colors[5]);
 			cc->rectangle(clip_rect.x, clip_rect.y, clip_rect.width, clip_rect.height);
-			cc->set_source_rgb (colors[3], colors[4], colors[5]);
-			cc->fill_preserve();
-			cc->clip();
+			//cc->fill_preserve();
+			//cc->clip();
+			cc->fill ();
 
-			cc->set_source_rgb(colors[0], colors[1], colors[2]);
-			cc->set_line_width(note_height);
+			//cc->set_source_rgb(colors[0], colors[1], colors[2]);
+			//cc->set_line_width(note_height);
+
 
 			lnote = 127 - (int) floor((double) (clip_rect.y + clip_rect.height) * y2note) - 1;
 			hnote = 127 - (int) floor((double) clip_rect.y * y2note) + 1;
@@ -90,7 +94,7 @@ MidiScroomer::on_expose_event(GdkEventExpose* ev)
 			}
 
 			cc->reset_clip();
-		}
+		//}
 
 	}
 

@@ -68,7 +68,15 @@ PianoRollHeader::PianoRollHeader(MidiStreamView& v)
 	, _highlighted_note(NO_MIDI_NOTE)
 	, _clicked_note(NO_MIDI_NOTE)
 	, _dragging(false)
+	, _adj(v.note_range_adjustment)
 {
+	_adj.set_lower(0);
+	_adj.set_upper(127);
+
+	/* set minimum view range to one octave */
+	//set_min_page_size(12);
+
+	//_adj = v->note_range_adjustment;
 	add_events (Gdk::BUTTON_PRESS_MASK |
 		    Gdk::BUTTON_RELEASE_MASK |
 		    Gdk::POINTER_MOTION_MASK |
@@ -102,7 +110,34 @@ render_rect(Cairo::RefPtr<Cairo::Context> cr, int /*note*/, double x[], double y
 	cr->fill();
 }
 
-
+bool
+PianoRollHeader::on_scroll_event (GdkEventScroll* ev)
+{
+	int hovered_note = _view.y_to_note(ev->y);
+	switch (ev->direction) {
+	case GDK_SCROLL_UP:
+		_adj.set_value (min (_adj.get_value() + 1.0, _adj.get_upper() - _adj.get_page_size()));
+		break;
+	case GDK_SCROLL_DOWN:
+		_adj.set_value (_adj.get_value() - 1.0);
+		break;
+	case GDK_SCROLL_RIGHT: //ZOOM OUT
+		_adj.set_page_size (max(_adj.get_page_size () -1,0.0));
+		break;
+	case GDK_SCROLL_LEFT: //ZOOM IN
+		if (_adj.get_value() + _adj.get_page_size() < 127.0){
+			_adj.set_page_size (min(_adj.get_page_size () +1 ,  127.0 ));
+			_adj.set_value (_adj.get_value() - (_adj.get_page_size() / 10.0));
+		}
+		break;
+	default:
+		return false;
+	}
+	std::cout << "hilight note: " << std::to_string(_highlighted_note) << " HovNote: " << std::to_string(_view.y_to_note(ev->y)) << "val: " << _adj.get_value() << " upper: " << " page_size: "<< _adj.get_page_size () << std::endl;
+	_adj.value_changed ();
+	queue_draw ();
+	return true;
+}
 
 
 void
@@ -293,6 +328,7 @@ PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 		}
 	}
 
+	_adj.value_changed();
 	//win->process_updates(false);
 
 	return true;
@@ -399,11 +435,11 @@ PianoRollHeader::on_leave_notify_event (GdkEventCrossing*)
 	return true;
 }
 
-bool
-PianoRollHeader::on_scroll_event (GdkEventScroll*)
-{
-	return true;
-}
+//bool
+//PianoRollHeader::on_scroll_event (GdkEventScroll*)
+//{
+//	return true;
+//}
 
 void
 PianoRollHeader::note_range_changed()
@@ -522,3 +558,8 @@ PianoRollHeader::editor() const
 {
 	return _view.trackview().editor();
 }
+
+void
+PianoRollHeader::set_min_page_size(double page_size)
+{
+};

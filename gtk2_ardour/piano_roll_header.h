@@ -66,6 +66,8 @@ public:
 	sigc::signal<void,uint8_t> ExtendNoteSelection;
 
 private:
+  void set_min_page_size(double page_size);
+  Gtk::Adjustment& _adj;
 	static Color white;
 	static Color white_highlight;
 	static Color white_shade_light;

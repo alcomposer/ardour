@@ -150,10 +150,10 @@ MidiTimeAxisView::set_route (boost::shared_ptr<Route> rt)
 
 	if (is_track ()) {
 		_piano_roll_header = new PianoRollHeader(*midi_view());
-		_range_scroomer = new MidiScroomer(midi_view()->note_range_adjustment);
-		_range_scroomer->DoubleClicked.connect (
-			sigc::bind (sigc::mem_fun(*this, &MidiTimeAxisView::set_note_range),
-			            MidiStreamView::ContentsRange, false));
+		//_range_scroomer = new MidiScroomer(midi_view()->note_range_adjustment);
+		//_piano_roll_header->DoubleClicked.connect (
+		//	sigc::bind (sigc::mem_fun(*this, &MidiTimeAxisView::set_note_range),
+		//	            MidiStreamView::ContentsRange, false));
 	}
 
 	/* This next call will result in our height being set up, so it must come after
@@ -225,7 +225,7 @@ MidiTimeAxisView::set_route (boost::shared_ptr<Route> rt)
 		VBox* v = manage (new VBox);
 		HBox* h = manage (new HBox);
 		h->pack_end (*_piano_roll_header);
-		h->pack_end (*_range_scroomer);
+		//h->pack_end (*_range_scroomer);
 		v->pack_start (*separator, false, false);
 		v->pack_start (*h, true, true);
 		v->show ();
@@ -1690,7 +1690,7 @@ MidiTimeAxisView::note_range_changed ()
 void
 MidiTimeAxisView::contents_height_changed ()
 {
-	_range_scroomer->queue_resize ();
+	//_range_scroomer->queue_resize ();
 }
 
 bool
