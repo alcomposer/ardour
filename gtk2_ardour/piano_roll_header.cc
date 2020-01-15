@@ -121,19 +121,19 @@ PianoRollHeader::on_scroll_event (GdkEventScroll* ev)
 	case GDK_SCROLL_DOWN:
 		_adj.set_value (_adj.get_value() - 1.0);
 		break;
-	case GDK_SCROLL_RIGHT: //ZOOM OUT
+	case GDK_SCROLL_LEFT: //ZOOM OUT
 		_adj.set_page_size (max(_adj.get_page_size () -1,0.0));
 		break;
-	case GDK_SCROLL_LEFT: //ZOOM IN
+	case GDK_SCROLL_RIGHT: //ZOOM IN
 		if (_adj.get_value() + _adj.get_page_size() < 127.0){
-			_adj.set_page_size (min(_adj.get_page_size () +1 ,  127.0 ));
-			_adj.set_value (_adj.get_value() - (_adj.get_page_size() / 10.0));
+		//	_adj.set_page_size (min(_adj.get_page_size () +1 ,  127.0 ));
+		//	_adj.set_value (_adj.get_value() - (_adj.get_page_size() / 10.0));
 		}
 		break;
 	default:
 		return false;
 	}
-	std::cout << "hilight note: " << std::to_string(_highlighted_note) << " HovNote: " << std::to_string(_view.y_to_note(ev->y)) << "val: " << _adj.get_value() << " upper: " << " page_size: "<< _adj.get_page_size () << std::endl;
+	std::cout << "hilight_note: " << std::to_string(_highlighted_note) << " Hov_Note: " << std::to_string(_view.y_to_note(ev->y)) << " Val: " << _adj.get_value() << " upper: " << _adj.get_upper() << " lower: " << _adj.get_lower() << " page_size: "<< _adj.get_page_size () << std::endl;
 	_adj.value_changed ();
 	queue_draw ();
 	return true;
@@ -339,8 +339,20 @@ PianoRollHeader::on_button_press_event (GdkEventButton* ev)
 {
 	int note = _view.y_to_note(ev->y);
 	bool tertiary = Keyboard::modifier_state_contains (ev->state, Keyboard::TertiaryModifier);
+	int modifiers;
 
-	if (ev->button == 2 && Keyboard::no_modifiers_active (ev->state)) {
+	modifiers = gtk_accelerator_get_default_mod_mask ();
+
+	if (ev->state == GDK_CONTROL_MASK){
+		if (ev->type == GDK_2BUTTON_PRESS) {
+			_adj.set_value (0.0);
+			_adj.set_page_size (127.0);
+			_adj.value_changed ();
+			queue_draw ();
+			return false;
+		}
+		return false;
+	} else if (ev->button == 2 && Keyboard::no_modifiers_active (ev->state)) {
 		SetNoteSelection (note); // EMIT SIGNAL
 		return true;
 	} else if (tertiary && (ev->button == 1 || ev->button == 2)) {
@@ -360,7 +372,6 @@ PianoRollHeader::on_button_press_event (GdkEventButton* ev)
 			reset_clicked_note(note);
 		}
 	}
-
 	return true;
 }
 
@@ -434,12 +445,6 @@ PianoRollHeader::on_leave_notify_event (GdkEventCrossing*)
 	_highlighted_note = NO_MIDI_NOTE;
 	return true;
 }
-
-//bool
-//PianoRollHeader::on_scroll_event (GdkEventScroll*)
-//{
-//	return true;
-//}
 
 void
 PianoRollHeader::note_range_changed()
