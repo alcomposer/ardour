@@ -45,7 +45,6 @@ public:
 	bool on_leave_notify_event (GdkEventCrossing*);
 
 	void on_size_request(Gtk::Requisition*);
-	void on_size_allocate(Gtk::Allocation& a);
 
 	void note_range_changed();
 	void set_note_highlight (uint8_t note);
@@ -66,6 +65,8 @@ public:
 	sigc::signal<void,uint8_t> ExtendNoteSelection;
 
 private:
+  Gtk::Requisition* _r;
+  double _raw_note_height;
   void set_min_page_size(double page_size);
   Gtk::Adjustment& _adj;
 	static Color white;
@@ -111,7 +112,6 @@ private:
 	bool _dragging;
 
 	double _note_height;
-	double _black_note_width;
 
 	PublicEditor& editor() const;
 };

@@ -145,13 +145,13 @@ PianoRollHeader::get_path(int note, double x[], double y[])
 {
 	double y_pos = floor(_view.note_to_y(note));
 	double note_height;
-	double raw_note_height = floor(_view.note_to_y(note - 1)) - y_pos;
+	_raw_note_height = floor(_view.note_to_y(note - 1)) - y_pos;
 	double width = get_width();
 
 	if (note == 0) {
 		note_height = floor(_view.contents_height()) - y_pos;
 	} else {
-		note_height = raw_note_height <= 3? raw_note_height : raw_note_height - 1.f;
+		note_height = _raw_note_height <= 3? _raw_note_height : _raw_note_height - 1.f;
 	}
 	x[0] = 1.f;
 	y[0] = y_pos + note_height;
@@ -174,7 +174,6 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	int lowest, highest;
 	PianoRollHeader::Color bg;
 	Cairo::RefPtr<Cairo::Context> cr = get_window()->create_cairo_context();
-	Cairo::RefPtr<Cairo::LinearGradient> pat = Cairo::LinearGradient::create(0, 0, _black_note_width, 0);
 	double x[9];
 	double y[9];
 	int oct_rel;
@@ -210,12 +209,6 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	cr->move_to(get_width(),rect.y);
 	cr->line_to(get_width(), rect.y + rect.height);
 	cr->stroke();
-
-	//pat->add_color_stop_rgb(0.0, 0.33, 0.33, 0.33);
-	//pat->add_color_stop_rgb(0.2, 0.39, 0.39, 0.39);
-	//pat->add_color_stop_rgb(1.0, 0.22, 0.22, 0.22);
-	//cr->set_source(pat);
-
 
 	for (int i = lowest; i <= highest; ++i) {
 		oct_rel = i % 12;
@@ -291,6 +284,7 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 			cr->show_text(s.str());
 		}
 	}
+	on_size_request(_r);
 
 	return true;
 }
@@ -459,34 +453,8 @@ PianoRollHeader::invalidate_note_range(int lowest, int highest)
 	Glib::RefPtr<Gdk::Window> win = get_window();
 	Gdk::Rectangle rect;
 
-	// the non-rectangular geometry of some of the notes requires more
-	// redraws than the notes that actually changed.
-	switch(lowest % 12) {
-	case 0:
-	case 5:
-		lowest = max((int) _view.lowest_note(), lowest);
-		break;
-	default:
-		lowest = max((int) _view.lowest_note(), lowest - 1);
-		break;
-	}
-
-	switch(highest % 12) {
-	case 4:
-	case 11:
-		highest = min((int) _view.highest_note(), highest);
-		break;
-	case 1:
-	case 3:
-	case 6:
-	case 8:
-	case 10:
-		highest = min((int) _view.highest_note(), highest + 1);
-		break;
-	default:
-		highest = min((int) _view.highest_note(), highest + 2);
-		break;
-	}
+	lowest = max((int) _view.lowest_note(), lowest - 1);
+	highest = min((int) _view.highest_note(), highest + 2);
 
 	double y = _view.note_to_y(highest);
 	double height = _view.note_to_y(lowest - 1) - y;
@@ -504,15 +472,15 @@ PianoRollHeader::invalidate_note_range(int lowest, int highest)
 void
 PianoRollHeader::on_size_request(Gtk::Requisition* r)
 {
-	r->width = std::max (20.f, rintf (20.f * UIConfiguration::instance().get_ui_scale()));
-}
+	_r = r;
+	float rtn;
+	if (_raw_note_height >= 5.0){
+	rtn = std::max (100.f, rintf (100.f * UIConfiguration::instance().get_ui_scale()));
+	} else {
+	rtn = std::max (25.f, rintf (25.f * UIConfiguration::instance().get_ui_scale()));
+	}
+	r->width = rtn;
 
-void
-PianoRollHeader::on_size_allocate(Gtk::Allocation& a)
-{
-	DrawingArea::on_size_allocate(a);
-
-	_black_note_width = floor(0.7 * get_width());// + 0.5f;
 }
 
 void
