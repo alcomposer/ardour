@@ -169,6 +169,8 @@ PianoRollHeader::get_path(int note, double x[], double y[])
 bool
 PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 {
+	//queue_resize();
+
 	GdkRectangle& rect = ev->area;
 	double font_size;
 	int lowest, highest;
@@ -284,7 +286,7 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 			cr->show_text(s.str());
 		}
 	}
-	on_size_request(_r);
+	//on_size_request(_r);
 
 	return true;
 }
@@ -472,15 +474,14 @@ PianoRollHeader::invalidate_note_range(int lowest, int highest)
 void
 PianoRollHeader::on_size_request(Gtk::Requisition* r)
 {
-	_r = r;
+	//_r = r;
 	float rtn;
-	if (_raw_note_height >= 5.0){
-	rtn = std::max (100.f, rintf (100.f * UIConfiguration::instance().get_ui_scale()));
-	} else {
+	//if (_raw_note_height >= 5.0){
+	//rtn = std::max (100.f, rintf (100.f * UIConfiguration::instance().get_ui_scale()));
+	//} else {
 	rtn = std::max (25.f, rintf (25.f * UIConfiguration::instance().get_ui_scale()));
-	}
+	//}
 	r->width = rtn;
-
 }
 
 void
