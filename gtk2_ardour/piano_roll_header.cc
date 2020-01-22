@@ -490,6 +490,7 @@ PianoRollHeader::invalidate_note_range(int lowest, int highest)
 	if (win) {
 		win->invalidate_rect(rect, false);
 	}
+	queue_draw ();
 }
 
 void
