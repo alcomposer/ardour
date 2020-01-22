@@ -69,6 +69,7 @@ PianoRollHeader::PianoRollHeader(MidiStreamView& v)
 	, _clicked_note(NO_MIDI_NOTE)
 	, _dragging(false)
 	, _adj(v.note_range_adjustment)
+	, _scroomer_size(5.f)
 {
 	_adj.set_lower(0);
 	_adj.set_upper(127);
@@ -110,6 +111,22 @@ render_rect(Cairo::RefPtr<Cairo::Context> cr, int /*note*/, double x[], double y
 	cr->fill();
 }
 
+void
+PianoRollHeader::render_scroomer(Cairo::RefPtr<Cairo::Context> cr, GdkRectangle& rect)
+{
+	double scroomer_top = max(1.0, (1.0 - ((_adj.get_value()+_adj.get_page_size()) / 127.0)) * rect.height );
+	double scroomer_bottom = (1.0 - (_adj.get_value () / 127.0)) * rect.height;
+	double scroomer_width = _scroomer_size;
+
+	cr->set_source_rgb(0.f, 1.f, 0.f);
+	cr->move_to(1.f, scroomer_top);
+	cr->line_to(scroomer_width - 1.f, scroomer_top);
+	cr->line_to(scroomer_width - 1.f, scroomer_bottom);
+	cr->line_to(1.f, scroomer_bottom);
+	cr->line_to(1.f, scroomer_top);
+	cr->fill();
+}
+
 bool
 PianoRollHeader::on_scroll_event (GdkEventScroll* ev)
 {
@@ -143,6 +160,7 @@ PianoRollHeader::on_scroll_event (GdkEventScroll* ev)
 void
 PianoRollHeader::get_path(int note, double x[], double y[])
 {
+	double scroomer_size = _scroomer_size;
 	double y_pos = floor(_view.note_to_y(note));
 	double note_height;
 	_raw_note_height = floor(_view.note_to_y(note - 1)) - y_pos;
@@ -153,15 +171,15 @@ PianoRollHeader::get_path(int note, double x[], double y[])
 	} else {
 		note_height = _raw_note_height <= 3? _raw_note_height : _raw_note_height - 1.f;
 	}
-	x[0] = 1.f;
+	x[0] = scroomer_size;
 	y[0] = y_pos + note_height;
-	x[1] = 1.f;
+	x[1] = scroomer_size;
 	y[1] = y_pos;
 	x[2] = width;
 	y[2] = y_pos;
 	x[3] = width;
 	y[3] = y_pos + note_height;
-	x[4] = 1.f;
+	x[4] = scroomer_size;
 	y[4] = y_pos + note_height;
 	return;
 }
@@ -282,10 +300,12 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 
 			//cr->get_text_extents(s.str(), te);
 			cr->set_source_rgb(0.30f, 0.30f, 0.30f);
-			cr->move_to(2.0f, y + note_height - 1.0f - (note_height - font_size) / 2.0f);
+			cr->move_to(_scroomer_size + 2.f, y + note_height - 1.0f - (note_height - font_size) / 2.0f);
 			cr->show_text(s.str());
 		}
 	}
+
+	render_scroomer(cr, ev->area);
 	//on_size_request(_r);
 
 	return true;
@@ -324,7 +344,8 @@ PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 		}
 	}
 
-	_adj.value_changed();
+	_adj.value_changed ();
+	queue_draw ();
 	//win->process_updates(false);
 
 	return true;

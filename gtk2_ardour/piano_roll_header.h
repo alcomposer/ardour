@@ -68,6 +68,8 @@ private:
   Gtk::Requisition* _r;
   double _raw_note_height;
   void set_min_page_size(double page_size);
+  void render_scroomer(Cairo::RefPtr<Cairo::Context>, GdkRectangle&);
+
   Gtk::Adjustment& _adj;
 	static Color white;
 	static Color white_highlight;
@@ -110,6 +112,7 @@ private:
 	uint8_t _clicked_note;
 	double _grab_y;
 	bool _dragging;
+  double _scroomer_size;
 
 	double _note_height;
 
