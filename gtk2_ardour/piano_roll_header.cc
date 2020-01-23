@@ -118,7 +118,7 @@ PianoRollHeader::render_scroomer(Cairo::RefPtr<Cairo::Context> cr, GdkRectangle&
 	double scroomer_bottom = (1.0 - (_adj.get_value () / 127.0)) * rect.height;
 	double scroomer_width = _scroomer_size;
 
-	cr->set_source_rgb(0.f, 1.f, 0.f);
+	cr->set_source_rgb(white.r, white.g, white.b);
 	cr->move_to(1.f, scroomer_top);
 	cr->line_to(scroomer_width - 1.f, scroomer_top);
 	cr->line_to(scroomer_width - 1.f, scroomer_bottom);
