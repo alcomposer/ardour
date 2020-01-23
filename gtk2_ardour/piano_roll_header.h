@@ -113,6 +113,8 @@ private:
 	double _grab_y;
 	bool _dragging;
   double _scroomer_size;
+  bool _scroomer_drag;
+  double _old_y;
 
 	double _note_height;
 

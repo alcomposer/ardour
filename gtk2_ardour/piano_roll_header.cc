@@ -69,7 +69,9 @@ PianoRollHeader::PianoRollHeader(MidiStreamView& v)
 	, _clicked_note(NO_MIDI_NOTE)
 	, _dragging(false)
 	, _adj(v.note_range_adjustment)
-	, _scroomer_size(5.f)
+	, _scroomer_size(80.f)
+	, _scroomer_drag(false)
+	, _old_y(0.0)
 {
 	_adj.set_lower(0);
 	_adj.set_upper(127);
@@ -118,7 +120,7 @@ PianoRollHeader::render_scroomer(Cairo::RefPtr<Cairo::Context> cr, GdkRectangle&
 	double scroomer_bottom = (1.0 - (_adj.get_value () / 127.0)) * rect.height;
 	double scroomer_width = _scroomer_size;
 
-	cr->set_source_rgb(white.r, white.g, white.b);
+	cr->set_source_rgba(white.r, white.g, white.b, 0.15);
 	cr->move_to(1.f, scroomer_top);
 	cr->line_to(scroomer_width - 1.f, scroomer_top);
 	cr->line_to(scroomer_width - 1.f, scroomer_bottom);
@@ -316,6 +318,22 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 			cr->move_to(_scroomer_size + 2.f, y + note_height - 1.0f - (note_height - font_size) / 2.0f);
 			cr->show_text(s.str());
 		}
+		/* render the MIDNAM test only */
+		if (true) {
+			std::stringstream s;
+			double y = floor(_view.note_to_y(i)) - 0.5f;
+			double note_height = floor(_view.note_to_y(i - 1)) - y;
+
+			//int cn = i / 12 - 1;
+			s << "MIDNAM " << i;
+
+			//cr->get_text_extents(s.str(), te);
+			cr->set_source_rgb(white.r, white.g, white.b);
+			cr->move_to(3.f, y + note_height - 1.0f - (note_height - font_size) / 2.0f);
+			cr->show_text(s.str());
+		}
+
+
 	}
 
 	render_scroomer(cr, ev->area);
@@ -327,36 +345,44 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 bool
 PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 {
-	int note = _view.y_to_note(ev->y);
-	set_note_highlight (note);
+	if (_scroomer_drag){
+		double delta = _old_y - ev->y;
+		int note_range = _adj.get_page_size ();
+		int note_lower = _adj.get_value ();
 
-	if (_dragging) {
+		_adj.set_value (min(note_lower + (delta * (note_range / 127.0)),127.0 - note_range));
+	}else{
+		int note = _view.y_to_note(ev->y);
+		set_note_highlight (note);
 
-		if ( false /*editor().current_mouse_mode() == Editing::MouseRange*/ ) {   //ToDo:  fix this.  this mode is buggy, and of questionable utility anyway
+		if (_dragging) {
 
-			/* select note range */
+			if ( false /*editor().current_mouse_mode() == Editing::MouseRange*/ ) {   //ToDo:  fix this.  this mode is buggy, and of questionable utility anyway
 
-			if (Keyboard::no_modifiers_active (ev->state)) {
-				AddNoteSelection (note); // EMIT SIGNAL
-			}
+				/* select note range */
 
-		} else {
-			/* play notes */
-			/* redraw already taken care of above in set_note_highlight */
-			if (_clicked_note != NO_MIDI_NOTE && _clicked_note != note) {
-				_active_notes[_clicked_note] = false;
-				send_note_off(_clicked_note);
+				if (Keyboard::no_modifiers_active (ev->state)) {
+					AddNoteSelection (note); // EMIT SIGNAL
+				}
 
-				_clicked_note = note;
+			} else {
+				/* play notes */
+				/* redraw already taken care of above in set_note_highlight */
+				if (_clicked_note != NO_MIDI_NOTE && _clicked_note != note) {
+					_active_notes[_clicked_note] = false;
+					send_note_off(_clicked_note);
 
-				if (!_active_notes[note]) {
-					_active_notes[note] = true;
-					send_note_on(note);
+					_clicked_note = note;
+
+					if (!_active_notes[note]) {
+						_active_notes[note] = true;
+						send_note_on(note);
+					}
 				}
 			}
 		}
 	}
-
+	_old_y = ev->y;
 	_adj.value_changed ();
 	queue_draw ();
 	//win->process_updates(false);
@@ -367,39 +393,44 @@ PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 bool
 PianoRollHeader::on_button_press_event (GdkEventButton* ev)
 {
-	int note = _view.y_to_note(ev->y);
-	bool tertiary = Keyboard::modifier_state_contains (ev->state, Keyboard::TertiaryModifier);
-	int modifiers;
+	if (ev->button == 1 && ev->x <= _scroomer_size){
+		_scroomer_drag = true;
+		return true;
+	}else {
+		int note = _view.y_to_note(ev->y);
+		bool tertiary = Keyboard::modifier_state_contains (ev->state, Keyboard::TertiaryModifier);
+		int modifiers;
 
-	modifiers = gtk_accelerator_get_default_mod_mask ();
+		modifiers = gtk_accelerator_get_default_mod_mask ();
 
-	if (ev->state == GDK_CONTROL_MASK){
-		if (ev->type == GDK_2BUTTON_PRESS) {
-			_adj.set_value (0.0);
-			_adj.set_page_size (127.0);
-			_adj.value_changed ();
-			queue_draw ();
+		if (ev->state == GDK_CONTROL_MASK){
+			if (ev->type == GDK_2BUTTON_PRESS) {
+				_adj.set_value (0.0);
+				_adj.set_page_size (127.0);
+				_adj.value_changed ();
+				queue_draw ();
+				return false;
+			}
 			return false;
-		}
-		return false;
-	} else if (ev->button == 2 && Keyboard::no_modifiers_active (ev->state)) {
-		SetNoteSelection (note); // EMIT SIGNAL
-		return true;
-	} else if (tertiary && (ev->button == 1 || ev->button == 2)) {
-		ExtendNoteSelection (note); // EMIT SIGNAL
-		return true;
-	} else if (ev->button == 1 && note >= 0 && note < 128) {
-		add_modal_grab();
-		_dragging = true;
+		} else if (ev->button == 2 && Keyboard::no_modifiers_active (ev->state)) {
+			SetNoteSelection (note); // EMIT SIGNAL
+			return true;
+		} else if (tertiary && (ev->button == 1 || ev->button == 2)) {
+			ExtendNoteSelection (note); // EMIT SIGNAL
+			return true;
+		} else if (ev->button == 1 && note >= 0 && note < 128) {
+			add_modal_grab();
+			_dragging = true;
 
-		if (!_active_notes[note]) {
-			_active_notes[note] = true;
-			_clicked_note = note;
-			send_note_on(note);
+			if (!_active_notes[note]) {
+				_active_notes[note] = true;
+				_clicked_note = note;
+				send_note_on(note);
 
-			invalidate_note_range(note, note);
-		} else {
-			reset_clicked_note(note);
+				invalidate_note_range(note, note);
+			} else {
+				reset_clicked_note(note);
+			}
 		}
 	}
 	return true;
@@ -408,6 +439,9 @@ PianoRollHeader::on_button_press_event (GdkEventButton* ev)
 bool
 PianoRollHeader::on_button_release_event (GdkEventButton* ev)
 {
+	if (_scroomer_drag){
+		_scroomer_drag = false;
+	}
 	int note = _view.y_to_note(ev->y);
 
 	if (false /*editor().current_mouse_mode() == Editing::MouseRange*/ ) {  //Todo:  this mode is buggy, and of questionable utility anyway
@@ -514,7 +548,7 @@ PianoRollHeader::on_size_request(Gtk::Requisition* r)
 	//if (_raw_note_height >= 5.0){
 	//rtn = std::max (100.f, rintf (100.f * UIConfiguration::instance().get_ui_scale()));
 	//} else {
-	rtn = std::max (25.f, rintf (25.f * UIConfiguration::instance().get_ui_scale()));
+	rtn = std::max (80.f, rintf (80.f * UIConfiguration::instance().get_ui_scale()));
 	//}
 	r->width = rtn;
 }
