@@ -138,10 +138,10 @@ PianoRollHeader::on_scroll_event (GdkEventScroll* ev)
 
 	if(ev->state == GDK_SHIFT_MASK){
 		switch (ev->direction) {
-		case GDK_SCROLL_UP:
+		case GDK_SCROLL_UP: //ZOOM IN
 			_view.apply_note_range (min(note_lower + 1, 127), max(note_lower + note_range - 1,0), true);
 			break;
-		case GDK_SCROLL_DOWN:
+		case GDK_SCROLL_DOWN: //ZOOM OUT
 			_view.apply_note_range (max(note_lower - 1,0), min(note_lower + note_range + 1, 127), true);
 			break;
 		default:
@@ -154,12 +154,6 @@ PianoRollHeader::on_scroll_event (GdkEventScroll* ev)
 			break;
 		case GDK_SCROLL_DOWN:
 			_adj.set_value (note_lower - 1.0);
-			break;
-		case GDK_SCROLL_LEFT: //ZOOM OUT
-			_view.apply_note_range (min(note_lower + 1, 127), max(note_lower + note_range - 1,0), true);
-			break;
-		case GDK_SCROLL_RIGHT: //ZOOM IN
-			_view.apply_note_range (max(note_lower - 1,0), min(note_lower + note_range + 1, 127), true);
 			break;
 		default:
 			return false;
