@@ -130,25 +130,38 @@ PianoRollHeader::render_scroomer(Cairo::RefPtr<Cairo::Context> cr, GdkRectangle&
 bool
 PianoRollHeader::on_scroll_event (GdkEventScroll* ev)
 {
+	int note_range = _adj.get_page_size ();
+	int note_lower = _adj.get_value ();
 	int hovered_note = _view.y_to_note(ev->y);
-	switch (ev->direction) {
-	case GDK_SCROLL_UP:
-		_adj.set_value (min (_adj.get_value() + 1.0, _adj.get_upper() - _adj.get_page_size()));
-		break;
-	case GDK_SCROLL_DOWN:
-		_adj.set_value (_adj.get_value() - 1.0);
-		break;
-	case GDK_SCROLL_LEFT: //ZOOM OUT
-		_adj.set_page_size (max(_adj.get_page_size () -1,0.0));
-		break;
-	case GDK_SCROLL_RIGHT: //ZOOM IN
-		if (_adj.get_value() + _adj.get_page_size() < 127.0){
-		//	_adj.set_page_size (min(_adj.get_page_size () +1 ,  127.0 ));
-		//	_adj.set_value (_adj.get_value() - (_adj.get_page_size() / 10.0));
+
+	if(ev->state == GDK_SHIFT_MASK){
+		switch (ev->direction) {
+		case GDK_SCROLL_UP:
+			_view.apply_note_range (min(note_lower + 1, 127), max(note_lower + note_range - 1,0), true);
+			break;
+		case GDK_SCROLL_DOWN:
+			_view.apply_note_range (max(note_lower - 1,0), min(note_lower + note_range + 1, 127), true);
+			break;
+		default:
+			return false;
 		}
-		break;
-	default:
-		return false;
+	}else{
+		switch (ev->direction) {
+		case GDK_SCROLL_UP:
+			_adj.set_value (min (note_lower + 1, 127 - note_range));
+			break;
+		case GDK_SCROLL_DOWN:
+			_adj.set_value (note_lower - 1.0);
+			break;
+		case GDK_SCROLL_LEFT: //ZOOM OUT
+			_view.apply_note_range (min(note_lower + 1, 127), max(note_lower + note_range - 1,0), true);
+			break;
+		case GDK_SCROLL_RIGHT: //ZOOM IN
+			_view.apply_note_range (max(note_lower - 1,0), min(note_lower + note_range + 1, 127), true);
+			break;
+		default:
+			return false;
+		}
 	}
 	std::cout << "hilight_note: " << std::to_string(_highlighted_note) << " Hov_Note: " << std::to_string(_view.y_to_note(ev->y)) << " Val: " << _adj.get_value() << " upper: " << _adj.get_upper() << " lower: " << _adj.get_lower() << " page_size: "<< _adj.get_page_size () << std::endl;
 	_adj.value_changed ();
