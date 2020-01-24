@@ -115,6 +115,8 @@ private:
   double _scroomer_size;
   bool _scroomer_drag;
   double _old_y;
+  double _height;
+  double _fract;
 
 	double _note_height;
 

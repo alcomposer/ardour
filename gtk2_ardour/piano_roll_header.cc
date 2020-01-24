@@ -69,7 +69,7 @@ PianoRollHeader::PianoRollHeader(MidiStreamView& v)
 	, _clicked_note(NO_MIDI_NOTE)
 	, _dragging(false)
 	, _adj(v.note_range_adjustment)
-	, _scroomer_size(80.f)
+	, _scroomer_size(70.f)
 	, _scroomer_drag(false)
 	, _old_y(0.0)
 {
@@ -205,6 +205,7 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	//queue_resize();
 
 	GdkRectangle& rect = ev->area;
+	_height = ev->area.height;
 	double font_size;
 	int lowest, highest;
 	PianoRollHeader::Color bg;
@@ -346,11 +347,20 @@ bool
 PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 {
 	if (_scroomer_drag){
+		double pixel2val = 127.0 / get_height();
+		cout << "height: " << get_height() << " UI SCALE: " << UIConfiguration::instance().get_ui_scale() << endl;
 		double delta = _old_y - ev->y;
-		int note_range = _adj.get_page_size ();
-		int note_lower = _adj.get_value ();
+		double val_at_pointer = (delta * pixel2val);
 
-		_adj.set_value (min(note_lower + (delta * (note_range / 127.0)),127.0 - note_range));
+		double note_range = _adj.get_page_size ();
+		int note_lower = _adj.get_value ();
+		_fract += val_at_pointer;
+
+		_fract = (_fract + note_range > 127.0)? 127.0 - note_range : _fract;
+		_fract = (_fract <   0.0)? 0.0 : _fract;
+
+
+		_adj.set_value (min(_fract, 127.0 - note_range));//(delta * _height / note_range),127.0 - note_range));
 	}else{
 		int note = _view.y_to_note(ev->y);
 		set_note_highlight (note);
@@ -382,9 +392,9 @@ PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 			}
 		}
 	}
-	_old_y = ev->y;
 	_adj.value_changed ();
 	queue_draw ();
+	_old_y = ev->y;
 	//win->process_updates(false);
 
 	return true;
@@ -395,6 +405,8 @@ PianoRollHeader::on_button_press_event (GdkEventButton* ev)
 {
 	if (ev->button == 1 && ev->x <= _scroomer_size){
 		_scroomer_drag = true;
+		_old_y = ev->y;
+		_fract = _adj.get_value();
 		return true;
 	}else {
 		int note = _view.y_to_note(ev->y);
