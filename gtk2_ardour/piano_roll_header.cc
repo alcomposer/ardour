@@ -72,6 +72,7 @@ PianoRollHeader::PianoRollHeader(MidiStreamView& v)
 	, _scroomer_size(70.f)
 	, _scroomer_drag(false)
 	, _old_y(0.0)
+	, _fract(0.0)
 {
 	_adj.set_lower(0);
 	_adj.set_upper(127);
@@ -196,10 +197,7 @@ PianoRollHeader::get_path(int note, double x[], double y[])
 bool
 PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 {
-	//queue_resize();
-
 	GdkRectangle& rect = ev->area;
-	_height = ev->area.height;
 	double font_size;
 	int lowest, highest;
 	PianoRollHeader::Color bg;
@@ -327,12 +325,8 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 			cr->move_to(3.f, y + note_height - 1.0f - (note_height - font_size) / 2.0f);
 			cr->show_text(s.str());
 		}
-
-
 	}
-
 	render_scroomer(cr, ev->area);
-	//on_size_request(_r);
 
 	return true;
 }
@@ -342,19 +336,16 @@ PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 {
 	if (_scroomer_drag){
 		double pixel2val = 127.0 / get_height();
-		cout << "height: " << get_height() << " UI SCALE: " << UIConfiguration::instance().get_ui_scale() << endl;
 		double delta = _old_y - ev->y;
 		double val_at_pointer = (delta * pixel2val);
-
 		double note_range = _adj.get_page_size ();
-		int note_lower = _adj.get_value ();
+
 		_fract += val_at_pointer;
 
 		_fract = (_fract + note_range > 127.0)? 127.0 - note_range : _fract;
-		_fract = (_fract <   0.0)? 0.0 : _fract;
+		_fract = (_fract < 0.0)? 0.0 : _fract;
 
-
-		_adj.set_value (min(_fract, 127.0 - note_range));//(delta * _height / note_range),127.0 - note_range));
+		_adj.set_value (min(_fract, 127.0 - note_range));
 	}else{
 		int note = _view.y_to_note(ev->y);
 		set_note_highlight (note);
@@ -549,14 +540,7 @@ PianoRollHeader::invalidate_note_range(int lowest, int highest)
 void
 PianoRollHeader::on_size_request(Gtk::Requisition* r)
 {
-	//_r = r;
-	float rtn;
-	//if (_raw_note_height >= 5.0){
-	//rtn = std::max (100.f, rintf (100.f * UIConfiguration::instance().get_ui_scale()));
-	//} else {
-	rtn = std::max (80.f, rintf (80.f * UIConfiguration::instance().get_ui_scale()));
-	//}
-	r->width = rtn;
+	r->width = std::max (80.f, rintf (80.f * UIConfiguration::instance().get_ui_scale()));
 }
 
 void

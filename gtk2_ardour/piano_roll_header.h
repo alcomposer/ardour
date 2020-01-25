@@ -65,8 +65,6 @@ public:
 	sigc::signal<void,uint8_t> ExtendNoteSelection;
 
 private:
-  Gtk::Requisition* _r;
-  double _raw_note_height;
   void set_min_page_size(double page_size);
   void render_scroomer(Cairo::RefPtr<Cairo::Context>, GdkRectangle&);
 
@@ -115,8 +113,8 @@ private:
   double _scroomer_size;
   bool _scroomer_drag;
   double _old_y;
-  double _height;
   double _fract;
+  double _raw_note_height;
 
 	double _note_height;
 
