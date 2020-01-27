@@ -67,6 +67,7 @@ public:
 private:
   void set_min_page_size(double page_size);
   void render_scroomer(Cairo::RefPtr<Cairo::Context>, GdkRectangle&);
+  std::string get_note_name (int note);
 
   Gtk::Adjustment& _adj;
 	static Color white;

@@ -31,6 +31,9 @@
 #include "midi_streamview.h"
 #include "public_editor.h"
 #include "ui_config.h"
+#include "midi++/midnam_patch.h"
+
+#include "pbd/i18n.h"
 
 using namespace std;
 using namespace Gtkmm2ext;
@@ -69,7 +72,7 @@ PianoRollHeader::PianoRollHeader(MidiStreamView& v)
 	, _clicked_note(NO_MIDI_NOTE)
 	, _dragging(false)
 	, _adj(v.note_range_adjustment)
-	, _scroomer_size(70.f)
+	, _scroomer_size(75.f)
 	, _scroomer_drag(false)
 	, _old_y(0.0)
 	, _fract(0.0)
@@ -318,7 +321,7 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 			double note_height = floor(_view.note_to_y(i - 1)) - y;
 
 			//int cn = i / 12 - 1;
-			s << "MIDNAM " << i;
+			s << get_note_name(i);
 
 			//cr->get_text_extents(s.str(), te);
 			cr->set_source_rgb(white.r, white.g, white.b);
@@ -329,6 +332,30 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	render_scroomer(cr, ev->area);
 
 	return true;
+}
+
+std::string
+PianoRollHeader::get_note_name (int note)
+{
+	using namespace MIDI::Name;
+	std::string name;
+
+	MidiTimeAxisView* mtv = dynamic_cast<MidiTimeAxisView*>(&_view.trackview());
+	if (mtv) {
+		boost::shared_ptr<MasterDeviceNames> device_names(mtv->get_device_names());
+		if (device_names) {
+			name = device_names->note_name(mtv->gui_property(X_("midnam-custom-device-mode")),
+			                               0, //Channel Hard-Coded for now
+			                               0,
+			                               0,
+			                               note);
+		}
+	}
+
+
+	char buf[128];
+	snprintf (buf, sizeof (buf), "%s", name.empty() ? std::to_string(note).c_str() : name.c_str());
+	return buf;
 }
 
 bool

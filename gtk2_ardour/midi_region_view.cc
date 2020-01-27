@@ -4306,6 +4306,7 @@ MidiRegionView::get_note_name (boost::shared_ptr<NoteType> n, uint8_t note_value
 		}
 	}
 
+
 	char buf[128];
 	snprintf (buf, sizeof (buf), "%d %s\nCh %d Vel %d",
 	          (int) note_value,
