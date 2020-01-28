@@ -210,6 +210,30 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	int oct_rel;
 	int y1 = max(rect.y, 0);
 	int y2 = min(rect.y + rect.height, (int) floor(_view.contents_height()));
+	double av_note_height = get_height () / _adj.get_page_size () ;
+
+	//Pango layout keyboard c's
+	auto layout = Pango::Layout::create(cr);
+	Pango::FontDescription font_descript ("Sans");
+	font_descript.set_absolute_size (av_note_height * 0.7 * Pango::SCALE);
+	layout->set_font_description(font_descript);
+
+	//Pango layout midnam c's
+	auto big_c_layout = Pango::Layout::create(cr);
+	Pango::FontDescription font_descript_big_c ("Sans");
+	font_descript_big_c.set_absolute_size (15.0 * Pango::SCALE);
+	big_c_layout->set_font_description(font_descript_big_c);
+	int bc_width, bc_height;
+
+	//Pango layout midnam
+	auto midnam_layout = Pango::Layout::create(cr);
+	pango_layout_set_ellipsize (midnam_layout->gobj (), PANGO_ELLIPSIZE_END);
+	pango_layout_set_width (midnam_layout->gobj (), (_scroomer_size - 2) * Pango::SCALE);
+	Pango::FontDescription font_descript_midnam ("Sans");
+	font_descript_midnam.set_absolute_size (av_note_height * 0.7 * Pango::SCALE);
+	midnam_layout->set_font_description(font_descript_midnam);
+
+
 
 	//Cairo::TextExtents te;
 	lowest = max(_view.lowest_note(), _view.y_to_note(y2));
@@ -240,6 +264,8 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	cr->move_to(get_width(),rect.y);
 	cr->line_to(get_width(), rect.y + rect.height);
 	cr->stroke();
+
+
 
 	for (int i = lowest; i <= highest; ++i) {
 		oct_rel = i % 12;
@@ -300,33 +326,41 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 
 		}
 
+
+		double y = floor(_view.note_to_y(i)) - 0.5f;
+		double note_height = floor(_view.note_to_y(i - 1)) - y;
+		int lw, lh;
+
 		/* render the name of which C this is */
 		if (oct_rel == 0) {
 			std::stringstream s;
-			double y = floor(_view.note_to_y(i)) - 0.5f;
-			double note_height = floor(_view.note_to_y(i - 1)) - y;
 
 			int cn = i / 12 - 1;
 			s << "C" << cn;
 
-			//cr->get_text_extents(s.str(), te);
-			cr->set_source_rgb(0.30f, 0.30f, 0.30f);
-			cr->move_to(_scroomer_size + 2.f, y + note_height - 1.0f - (note_height - font_size) / 2.0f);
-			cr->show_text(s.str());
+			if (av_note_height > 12.0){
+				cr->set_source_rgb(0.30f, 0.30f, 0.30f);
+				layout->set_text (s.str());
+				cr->move_to(_scroomer_size, y);
+				layout->show_in_cairo_context (cr);
+			}else{
+				cr->set_source_rgb(white.r, white.g, white.b);
+				big_c_layout->set_text (s.str());
+				pango_layout_get_pixel_size (big_c_layout->gobj(), &bc_width, &bc_height);
+				cr->move_to(_scroomer_size - 25, y - bc_height + av_note_height);
+				big_c_layout->show_in_cairo_context (cr);
+				cr->move_to(_scroomer_size - 25, y + note_height);
+				cr->line_to(_scroomer_size, y + note_height);
+				cr->stroke();
+
+			}
 		}
 		/* render the MIDNAM test only */
 		if (true) {
-			std::stringstream s;
-			double y = floor(_view.note_to_y(i)) - 0.5f;
-			double note_height = floor(_view.note_to_y(i - 1)) - y;
-
-			//int cn = i / 12 - 1;
-			s << get_note_name(i);
-
-			//cr->get_text_extents(s.str(), te);
+			midnam_layout->set_text (get_note_name(i));
 			cr->set_source_rgb(white.r, white.g, white.b);
-			cr->move_to(3.f, y + note_height - 1.0f - (note_height - font_size) / 2.0f);
-			cr->show_text(s.str());
+			cr->move_to(2.f, y);
+			midnam_layout->show_in_cairo_context (cr);
 		}
 	}
 	render_scroomer(cr, ev->area);
