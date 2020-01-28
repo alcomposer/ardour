@@ -105,8 +105,15 @@ private:
 
 	uint8_t _event[3];
 
-	Cairo::RefPtr<Cairo::Context> cc;
-	bool _active_notes[128];
+	//Cairo::RefPtr<Cairo::Context> cc; FIXME delete
+	Glib::RefPtr<Pango::Layout> _layout;
+  Glib::RefPtr<Pango::Layout> _big_c_layout;
+  Glib::RefPtr<Pango::Layout> _midnam_layout;
+
+  Pango::FontDescription _font_descript;
+  Pango::FontDescription _font_descript_big_c;
+  Pango::FontDescription _font_descript_midnam;
+  bool _active_notes[128];
 	uint8_t _highlighted_note;
 	uint8_t _clicked_note;
 	double _grab_y;
