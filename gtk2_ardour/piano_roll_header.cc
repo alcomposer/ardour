@@ -265,8 +265,6 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	cr->line_to(get_width(), rect.y + rect.height);
 	cr->stroke();
 
-
-
 	for (int i = lowest; i <= highest; ++i) {
 		oct_rel = i % 12;
 
@@ -307,17 +305,16 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 
 		switch(oct_rel) {
 		case 0:
-		case 5:
 		case 2:
+		case 4:
+		case 5:
 		case 7:
 		case 9:
-		case 4:
 		case 11:
 			cr->set_source_rgb(0.0f, 0.0f, 0.0f);
 			get_path(i, x, y);
 			render_rect(cr, i, x, y, bg);
 			break;
-
 		default:
 			break;
 
@@ -373,6 +370,8 @@ PianoRollHeader::get_note_name (int note)
 {
 	using namespace MIDI::Name;
 	std::string name;
+	std::string note_n;
+	std::string rtn;
 
 	MidiTimeAxisView* mtv = dynamic_cast<MidiTimeAxisView*>(&_view.trackview());
 	if (mtv) {
@@ -385,11 +384,50 @@ PianoRollHeader::get_note_name (int note)
 			                               note);
 		}
 	}
+	int oct_rel = note % 12;
+	switch(oct_rel) {
+		case 0:
+			note_n = "C";
+			break;
+		case 1:
+			note_n = "C♯";
+			break;
+		case 2:
+			note_n = "D";
+			break;
+		case 3:
+			note_n = "D♯";
+			break;
+		case 4:
+			note_n = "E";
+			break;
+		case 5:
+			note_n = "F";
+			break;
+		case 6:
+			note_n = "F♯";
+			break;
+		case 7:
+			note_n = "G";
+			break;
+		case 8:
+			note_n = "G♯";
+			break;
+		case 9:
+			note_n = "A";
+			break;
+		case 10:
+			note_n = "A♯";
+			break;
+		case 11:
+			note_n = "B";
+		default:
+			break;
+	}
 
-
-	char buf[128];
-	snprintf (buf, sizeof (buf), "%s", name.empty() ? std::to_string(note).c_str() : name.c_str());
-	return buf;
+	std::string new_string = std::string(3 - std::to_string(note).length(), '0') + std::to_string(note);
+	rtn = name.empty()? new_string + " : " + note_n : name;
+	return rtn;
 }
 
 bool
