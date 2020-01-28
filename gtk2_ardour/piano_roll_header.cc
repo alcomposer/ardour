@@ -44,6 +44,8 @@ PianoRollHeader::Color PianoRollHeader::white_highlight = PianoRollHeader::Color
 PianoRollHeader::Color PianoRollHeader::black = PianoRollHeader::Color(0.14f, 0.14f, 0.14f);
 PianoRollHeader::Color PianoRollHeader::black_highlight = PianoRollHeader::Color(0.60f, 0.10f, 0.10f);
 
+PianoRollHeader::Color PianoRollHeader::gray = PianoRollHeader::Color(0.50f, 0.50f, 0.50f);
+
 PianoRollHeader::Color::Color()
 	: r(1.0f)
 	, g(1.0f)
@@ -76,13 +78,16 @@ PianoRollHeader::PianoRollHeader(MidiStreamView& v)
 	, _scroomer_drag(false)
 	, _old_y(0.0)
 	, _fract(0.0)
-	, _font_descript("Sans")
+	, _font_descript("Sans Bold")
 	, _font_descript_big_c("Sans")
 	, _font_descript_midnam("Sans")
 {
 
 	_layout = Pango::Layout::create (get_pango_context());
+
 	_big_c_layout = Pango::Layout::create (get_pango_context());
+	_font_descript_big_c.set_absolute_size (10.0 * Pango::SCALE);
+	_big_c_layout->set_font_description(_font_descript_big_c);
 
 	_midnam_layout = Pango::Layout::create (get_pango_context());
 	pango_layout_set_ellipsize (_midnam_layout->gobj (), PANGO_ELLIPSIZE_END);
@@ -221,20 +226,20 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	int oct_rel;
 	int y1 = max(rect.y, 0);
 	int y2 = min(rect.y + rect.height, (int) floor(_view.contents_height()));
-	double av_note_height = get_height () / _adj.get_page_size () ;
+	double av_note_height = get_height () / _adj.get_page_size ();
+	int bc_height, bc_width;
 
-	//Pango layout keyboard c's
-	_font_descript.set_absolute_size (av_note_height * 0.7 * Pango::SCALE);
-	_layout->set_font_description(_font_descript);
+	//Reduce the frequency of Pango layout resizing
+	if (int(_old_av_note_height) != int(av_note_height)) {
+		//Set Pango layout keyboard c's size
+		_font_descript.set_absolute_size (av_note_height * 0.7 * Pango::SCALE);
+		_layout->set_font_description(_font_descript);
 
-	//Pango layout midnam c's
-	_font_descript_big_c.set_absolute_size (10.0 * Pango::SCALE);
-	_big_c_layout->set_font_description(_font_descript_big_c);
-	int bc_width, bc_height;
-
-	//Pango layout midnam
-	_font_descript_midnam.set_absolute_size (av_note_height * 0.7 * Pango::SCALE);
-	_midnam_layout->set_font_description(_font_descript_midnam);
+		//Set Pango layout midnam size
+		_font_descript_midnam.set_absolute_size (av_note_height * 0.7 * Pango::SCALE);
+		_midnam_layout->set_font_description(_font_descript_midnam);
+	}
+	_old_av_note_height = av_note_height;
 
 	lowest = max(_view.lowest_note(), _view.y_to_note(y2));
 	highest = min(_view.highest_note(), _view.y_to_note(y1));
@@ -351,7 +356,7 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 		/* render MIDNAM */
 		if (true) {
 			_midnam_layout->set_text (get_note_name(i));
-			cr->set_source_rgb(white.r, white.g, white.b);
+			av_note_height > 12.0? cr->set_source_rgb(white.r, white.g, white.b) : cr->set_source_rgb(gray.r, gray.g, gray.b);
 			cr->move_to(2.f, y);
 			_midnam_layout->show_in_cairo_context (cr);
 		}

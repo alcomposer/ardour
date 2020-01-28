@@ -78,6 +78,7 @@ private:
 	static Color black_highlight;
 	static Color black_shade_light;
 	static Color black_shade_dark;
+  static Color gray;
 
 	PianoRollHeader(const PianoRollHeader&);
 
@@ -124,6 +125,7 @@ private:
   double _raw_note_height;
 
 	double _note_height;
+  double _old_av_note_height;
 
 	PublicEditor& editor() const;
 };
