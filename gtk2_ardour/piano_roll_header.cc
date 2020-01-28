@@ -233,19 +233,12 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	font_descript_midnam.set_absolute_size (av_note_height * 0.7 * Pango::SCALE);
 	midnam_layout->set_font_description(font_descript_midnam);
 
-
-
-	//Cairo::TextExtents te;
 	lowest = max(_view.lowest_note(), _view.y_to_note(y2));
 	highest = min(_view.highest_note(), _view.y_to_note(y1));
 
 	if (lowest > 127) {
 		lowest = 0;
 	}
-
-	cr->select_font_face ("Roboto", Cairo::FONT_SLANT_NORMAL, Cairo::FONT_WEIGHT_BOLD);
-	font_size = min((double) 10.0f, _note_height - 4.0f);
-	cr->set_font_size(font_size);
 
 	/* fill the entire rect with the color for non-highlighted white notes.
 	 * then we won't have to draw the background for those notes,
@@ -352,7 +345,7 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 
 			}
 		}
-		/* render the MIDNAM test only */
+		/* render MIDNAM */
 		if (true) {
 			midnam_layout->set_text (get_note_name(i));
 			cr->set_source_rgb(white.r, white.g, white.b);
@@ -421,12 +414,13 @@ PianoRollHeader::get_note_name (int note)
 			break;
 		case 11:
 			note_n = "B";
+			break;
 		default:
 			break;
 	}
 
 	std::string new_string = std::string(3 - std::to_string(note).length(), '0') + std::to_string(note);
-	rtn = name.empty()? new_string + " : " + note_n : name;
+	rtn = name.empty()? new_string + " " + note_n : name;
 	return rtn;
 }
 
