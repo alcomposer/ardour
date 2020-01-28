@@ -105,7 +105,6 @@ private:
 
 	uint8_t _event[3];
 
-	//Cairo::RefPtr<Cairo::Context> cc; FIXME delete
 	Glib::RefPtr<Pango::Layout> _layout;
   Glib::RefPtr<Pango::Layout> _big_c_layout;
   Glib::RefPtr<Pango::Layout> _midnam_layout;
