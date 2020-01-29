@@ -134,6 +134,7 @@ MidiTimeAxisView::MidiTimeAxisView (PublicEditor& ed, Session* sess, ArdourCanva
 {
 	_midnam_model_selector.disable_scrolling();
 	_midnam_custom_device_mode_selector.disable_scrolling();
+	_midnam_channel_selector.disable_scrolling();
 }
 
 void
@@ -267,9 +268,11 @@ MidiTimeAxisView::set_route (boost::shared_ptr<Route> rt)
 
 	ArdourWidgets::set_tooltip (_midnam_model_selector, _("External MIDI Device"));
 	ArdourWidgets::set_tooltip (_midnam_custom_device_mode_selector, _("External Device Mode"));
+	ArdourWidgets::set_tooltip (_midnam_channel_selector, _("MIDNAM Channel Display"));
 
 	_midi_controls_box.pack_start (_midnam_model_selector, false, false, 2);
 	_midi_controls_box.pack_start (_midnam_custom_device_mode_selector, false, false, 2);
+	_midi_controls_box.pack_start (_midnam_channel_selector, false, false, 2);
 
 	_midi_controls_box.set_homogeneous(false);
 	_midi_controls_box.set_border_width (2);
@@ -316,7 +319,29 @@ MidiTimeAxisView::set_route (boost::shared_ptr<Route> rt)
 			create_automation_child (parameter, string_to<bool> (visible));
 		}
 	}
+	//Menu_Helpers::MenuElem elem = Gtk::Menu_Helpers::MenuElem(_("Plugin Provided"),
+	//				sigc::bind(sigc::mem_fun(*this, &MidiTimeAxisView::model_changed),
+	//					model_name));
+
+	for (int i = 1; i < 17; i++){
+		//std::string text = "Channel " + std::to_string(i+1);
+		_midnam_channel_selector.append_text_item(std::to_string(i));
+	}
+	_midnam_channel_selector.StateChanged.connect (sigc::mem_fun (*this, &MidiTimeAxisView::_midnam_channel_changed));
+	_midnam_channel_selector.set_active("1");
+	if (gui_property (X_("midnam-channel")).empty()) {
+		set_gui_property (X_("midnam-channel"), "1");
+	}
 }
+
+void
+MidiTimeAxisView::_midnam_channel_changed ()
+{
+	set_gui_property (X_("midnam-channel"), _midnam_channel_selector.get_text());
+	//std::cout << "midnam_changed(): " << _midnam_channel_selector.get_text() << std::endl;
+	_piano_roll_header->queue_draw();
+}
+
 
 void
 MidiTimeAxisView::processors_changed (RouteProcessorChange c)
@@ -417,6 +442,7 @@ MidiTimeAxisView::setup_midnam_patches ()
 	if (!get_device_names()) {
 		model_changed ("Generic");
 	}
+	_piano_roll_header->queue_draw();
 }
 
 void
@@ -442,12 +468,15 @@ MidiTimeAxisView::update_patch_selector ()
 	if (patch_manager.all_models().empty()) {
 		_midnam_model_selector.hide ();
 		_midnam_custom_device_mode_selector.hide ();
+		_midnam_channel_selector.hide ();
 	} else {
 		_midnam_model_selector.show ();
+		_midnam_channel_selector.show ();
 		if (_midnam_custom_device_mode_selector.items().size() > 1) {
 			_midnam_custom_device_mode_selector.show ();
 		}
 	}
+	_piano_roll_header->queue_draw();
 }
 
 
@@ -502,6 +531,7 @@ MidiTimeAxisView::model_changed(const std::string& model)
 	if (patch_change_dialog ()) {
 		patch_change_dialog ()->refresh ();
 	}
+	_piano_roll_header->queue_draw();
 }
 
 void
@@ -512,6 +542,8 @@ MidiTimeAxisView::custom_device_mode_changed(const std::string& mode)
 	set_gui_property (X_("midnam-custom-device-mode"), mode);
 	_midnam_custom_device_mode_selector.set_text(mode);
 	_route->instrument_info().set_external_instrument (model, mode);
+
+	_piano_roll_header->queue_draw();
 }
 
 MidiStreamView*

@@ -232,7 +232,7 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	//Reduce the frequency of Pango layout resizing
 	//if (int(_old_av_note_height) != int(av_note_height)) {
 		//Set Pango layout keyboard c's size
-		_font_descript.set_absolute_size ((int)av_note_height * 0.7 * Pango::SCALE);
+		_font_descript.set_absolute_size (av_note_height * 0.7 * Pango::SCALE);
 		_layout->set_font_description(_font_descript);
 
 		//Set Pango layout midnam size
@@ -240,6 +240,8 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 		_midnam_layout->set_font_description(_font_descript_midnam);
 	//}
 	//_old_av_note_height = av_note_height;
+
+	render_scroomer(cr, ev->area);
 
 	lowest = max(_view.lowest_note(), _view.y_to_note(y2));
 	highest = min(_view.highest_note(), _view.y_to_note(y1));
@@ -361,8 +363,6 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 			_midnam_layout->show_in_cairo_context (cr);
 		}
 	}
-	render_scroomer(cr, ev->area);
-
 	return true;
 }
 
@@ -378,8 +378,8 @@ PianoRollHeader::get_note_name (int note)
 	if (mtv) {
 		boost::shared_ptr<MasterDeviceNames> device_names(mtv->get_device_names());
 		if (device_names) {
-			name = device_names->note_name(mtv->gui_property(X_("midnam-custom-device-mode")),
-			                               9, //Channel Hard-Coded for now
+			name = device_names->note_name(mtv->gui_property (X_("midnam-custom-device-mode")),
+			                               stoi(mtv->gui_property (X_("midnam-channel")))-1,
 			                               0,
 			                               0,
 			                               note);
