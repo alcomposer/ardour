@@ -84,14 +84,10 @@ PianoRollHeader::PianoRollHeader(MidiStreamView& v)
 {
 
 	_layout = Pango::Layout::create (get_pango_context());
-
 	_big_c_layout = Pango::Layout::create (get_pango_context());
 	_font_descript_big_c.set_absolute_size (10.0 * Pango::SCALE);
 	_big_c_layout->set_font_description(_font_descript_big_c);
-
 	_midnam_layout = Pango::Layout::create (get_pango_context());
-	//pango_layout_set_ellipsize (_midnam_layout->gobj (), PANGO_ELLIPSIZE_END);
-	//pango_layout_set_width (_midnam_layout->gobj (), (_scroomer_size - 2) * Pango::SCALE);
 
 	_adj.set_lower(0);
 	_adj.set_upper(127);
@@ -283,10 +279,10 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 
 	auto gradient_ptr = Cairo::LinearGradient::create (55, 0, _scroomer_size, 0);
 	gradient_ptr->add_color_stop_rgba (0,.23,.23,.23,0);
-    gradient_ptr->add_color_stop_rgba (1,.23,.23,.23,1);
+	gradient_ptr->add_color_stop_rgba (1,.23,.23,.23,1);
 	cr->set_source (gradient_ptr);
-    cr->rectangle (55, 0, _scroomer_size, get_height () );
-    cr->fill();
+	cr->rectangle (55, 0, _scroomer_size, get_height () );
+	cr->fill();
 
 	render_scroomer(cr);
 
