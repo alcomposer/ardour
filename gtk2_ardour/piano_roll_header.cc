@@ -193,7 +193,7 @@ PianoRollHeader::get_path(int note, double x[], double y[])
 	double y_pos = floor(_view.note_to_y(note));
 	double note_height;
 	_raw_note_height = floor(_view.note_to_y(note - 1)) - y_pos;
-	double width = get_width();
+	double width = get_width() - 1.0f;
 
 	if (note == 0) {
 		note_height = floor(_view.contents_height()) - y_pos;
@@ -230,16 +230,16 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	int bc_height, bc_width;
 
 	//Reduce the frequency of Pango layout resizing
-	if (int(_old_av_note_height) != int(av_note_height)) {
+	//if (int(_old_av_note_height) != int(av_note_height)) {
 		//Set Pango layout keyboard c's size
-		_font_descript.set_absolute_size (av_note_height * 0.7 * Pango::SCALE);
+		_font_descript.set_absolute_size ((int)av_note_height * 0.7 * Pango::SCALE);
 		_layout->set_font_description(_font_descript);
 
 		//Set Pango layout midnam size
-		_font_descript_midnam.set_absolute_size (av_note_height * 0.7 * Pango::SCALE);
+		_font_descript_midnam.set_absolute_size ((int)av_note_height * 0.7 * Pango::SCALE);
 		_midnam_layout->set_font_description(_font_descript_midnam);
-	}
-	_old_av_note_height = av_note_height;
+	//}
+	//_old_av_note_height = av_note_height;
 
 	lowest = max(_view.lowest_note(), _view.y_to_note(y2));
 	highest = min(_view.highest_note(), _view.y_to_note(y1));
@@ -379,7 +379,7 @@ PianoRollHeader::get_note_name (int note)
 		boost::shared_ptr<MasterDeviceNames> device_names(mtv->get_device_names());
 		if (device_names) {
 			name = device_names->note_name(mtv->gui_property(X_("midnam-custom-device-mode")),
-			                               0, //Channel Hard-Coded for now
+			                               9, //Channel Hard-Coded for now
 			                               0,
 			                               0,
 			                               note);
