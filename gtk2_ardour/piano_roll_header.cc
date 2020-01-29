@@ -134,10 +134,10 @@ render_rect(Cairo::RefPtr<Cairo::Context> cr, int /*note*/, double x[], double y
 }
 
 void
-PianoRollHeader::render_scroomer(Cairo::RefPtr<Cairo::Context> cr, GdkRectangle& rect)
+PianoRollHeader::render_scroomer(Cairo::RefPtr<Cairo::Context> cr)
 {
-	double scroomer_top = max(1.0, (1.0 - ((_adj.get_value()+_adj.get_page_size()) / 127.0)) * rect.height );
-	double scroomer_bottom = (1.0 - (_adj.get_value () / 127.0)) * rect.height;
+	double scroomer_top = max(1.0, (1.0 - ((_adj.get_value()+_adj.get_page_size()) / 127.0)) * get_height () );
+	double scroomer_bottom = (1.0 - (_adj.get_value () / 127.0)) * get_height ();
 	double scroomer_width = _scroomer_size;
 
 	cr->set_source_rgba(white.r, white.g, white.b, 0.15);
@@ -241,7 +241,7 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	//}
 	//_old_av_note_height = av_note_height;
 
-	render_scroomer(cr, ev->area);
+	render_scroomer(cr);
 
 	lowest = max(_view.lowest_note(), _view.y_to_note(y2));
 	highest = min(_view.highest_note(), _view.y_to_note(y1));
@@ -265,7 +265,7 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	cr->line_to(0.f, rect.y + rect.height);
 	cr->stroke();
 	cr->move_to(get_width(),rect.y);
-	cr->line_to(get_width(), rect.y + rect.height);
+	cr->line_to(get_width(), rect.y + get_height ());
 	cr->stroke();
 
 	for (int i = lowest; i <= highest; ++i) {
