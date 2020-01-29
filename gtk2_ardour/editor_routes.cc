@@ -85,6 +85,7 @@ EditorRoutes::EditorRoutes (Editor* e)
 	: EditorComponent (e)
 	, _ignore_reorder (false)
 	, _ignore_selection_change (false)
+	, column_does_not_select (false)
 	, _no_redisplay (false)
 	, _adding_routes (false)
 	, _route_deletion_in_progress (false)
@@ -103,6 +104,8 @@ EditorRoutes::EditorRoutes (Editor* e)
 	_model = ListStore::create (_columns);
 	_display.set_model (_model);
 
+	_display.get_selection()->set_select_function (sigc::mem_fun (*this, &EditorRoutes::select_function));
+
 	// Record enable toggle
 	CellRendererPixbufMulti* rec_col_renderer = manage (new CellRendererPixbufMulti());
 
@@ -112,7 +115,7 @@ EditorRoutes::EditorRoutes (Editor* e)
 	rec_col_renderer->set_pixbuf (3, ::get_icon("record-step"));
 	rec_col_renderer->signal_changed().connect (sigc::mem_fun (*this, &EditorRoutes::on_tv_rec_enable_changed));
 
-	TreeViewColumn* rec_state_column = manage (new TreeViewColumn("R", *rec_col_renderer));
+	rec_state_column = manage (new TreeViewColumn("R", *rec_col_renderer));
 
 	rec_state_column->add_attribute(rec_col_renderer->property_state(), _columns.rec_state);
 	rec_state_column->add_attribute(rec_col_renderer->property_visible(), _columns.is_track);
@@ -130,7 +133,7 @@ EditorRoutes::EditorRoutes (Editor* e)
 	rec_safe_renderer->set_pixbuf (1, ::get_icon("rec-safe-enabled"));
 	rec_safe_renderer->signal_changed().connect (sigc::mem_fun (*this, &EditorRoutes::on_tv_rec_safe_toggled));
 
-	TreeViewColumn* rec_safe_column = manage (new TreeViewColumn(_("RS"), *rec_safe_renderer));
+	rec_safe_column = manage (new TreeViewColumn(_("RS"), *rec_safe_renderer));
 	rec_safe_column->add_attribute(rec_safe_renderer->property_state(), _columns.rec_safe);
 	rec_safe_column->add_attribute(rec_safe_renderer->property_visible(), _columns.is_track);
 	rec_safe_column->set_sizing(TREE_VIEW_COLUMN_FIXED);
@@ -146,7 +149,7 @@ EditorRoutes::EditorRoutes (Editor* e)
 	input_active_col_renderer->set_pixbuf (1, ::get_icon("midi-input-active"));
 	input_active_col_renderer->signal_changed().connect (sigc::mem_fun (*this, &EditorRoutes::on_input_active_changed));
 
-	TreeViewColumn* input_active_column = manage (new TreeViewColumn ("I", *input_active_col_renderer));
+	input_active_column = manage (new TreeViewColumn ("I", *input_active_col_renderer));
 
 	input_active_column->add_attribute(input_active_col_renderer->property_state(), _columns.is_input_active);
 	input_active_column->add_attribute (input_active_col_renderer->property_visible(), _columns.is_midi);
@@ -164,7 +167,7 @@ EditorRoutes::EditorRoutes (Editor* e)
 	mute_col_renderer->set_pixbuf (Gtkmm2ext::ExplicitActive, ::get_icon("mute-enabled"));
 	mute_col_renderer->signal_changed().connect (sigc::mem_fun (*this, &EditorRoutes::on_tv_mute_enable_toggled));
 
-	TreeViewColumn* mute_state_column = manage (new TreeViewColumn("M", *mute_col_renderer));
+	mute_state_column = manage (new TreeViewColumn("M", *mute_col_renderer));
 
 	mute_state_column->add_attribute(mute_col_renderer->property_state(), _columns.mute_state);
 	mute_state_column->set_sizing(TREE_VIEW_COLUMN_FIXED);
@@ -180,7 +183,7 @@ EditorRoutes::EditorRoutes (Editor* e)
 	solo_col_renderer->set_pixbuf (Gtkmm2ext::ImplicitActive, ::get_icon("soloed-by-others"));
 	solo_col_renderer->signal_changed().connect (sigc::mem_fun (*this, &EditorRoutes::on_tv_solo_enable_toggled));
 
-	TreeViewColumn* solo_state_column = manage (new TreeViewColumn("S", *solo_col_renderer));
+	solo_state_column = manage (new TreeViewColumn("S", *solo_col_renderer));
 
 	solo_state_column->add_attribute(solo_col_renderer->property_state(), _columns.solo_state);
 	solo_state_column->add_attribute(solo_col_renderer->property_visible(), _columns.solo_visible);
@@ -196,7 +199,7 @@ EditorRoutes::EditorRoutes (Editor* e)
 	solo_iso_renderer->set_pixbuf (1, ::get_icon("solo-isolate-enabled"));
 	solo_iso_renderer->signal_changed().connect (sigc::mem_fun (*this, &EditorRoutes::on_tv_solo_isolate_toggled));
 
-	TreeViewColumn* solo_isolate_state_column = manage (new TreeViewColumn("SI", *solo_iso_renderer));
+	solo_isolate_state_column = manage (new TreeViewColumn("SI", *solo_iso_renderer));
 
 	solo_isolate_state_column->add_attribute(solo_iso_renderer->property_state(), _columns.solo_isolate_state);
 	solo_isolate_state_column->add_attribute(solo_iso_renderer->property_visible(), _columns.solo_lock_iso_visible);
@@ -212,7 +215,7 @@ EditorRoutes::EditorRoutes (Editor* e)
 	solo_safe_renderer->set_pixbuf (1, ::get_icon("solo-safe-enabled"));
 	solo_safe_renderer->signal_changed().connect (sigc::mem_fun (*this, &EditorRoutes::on_tv_solo_safe_toggled));
 
-	TreeViewColumn* solo_safe_state_column = manage (new TreeViewColumn(_("SS"), *solo_safe_renderer));
+	solo_safe_state_column = manage (new TreeViewColumn(_("SS"), *solo_safe_renderer));
 	solo_safe_state_column->add_attribute(solo_safe_renderer->property_state(), _columns.solo_safe_state);
 	solo_safe_state_column->add_attribute(solo_safe_renderer->property_visible(), _columns.solo_lock_iso_visible);
 	solo_safe_state_column->set_sizing(TREE_VIEW_COLUMN_FIXED);
@@ -223,6 +226,10 @@ EditorRoutes::EditorRoutes (Editor* e)
 	_name_column = _display.append_column ("", _columns.text) - 1;
 	_visible_column = _display.append_column ("", _columns.visible) - 1;
 	_active_column = _display.append_column ("", _columns.active) - 1;
+
+	name_column = _display.get_column (_name_column);
+	visible_column = _display.get_column (_visible_column);
+	active_column = _display.get_column (_active_column);
 
 	_display.append_column (*input_active_column);
 	_display.append_column (*rec_state_column);
@@ -313,6 +320,7 @@ EditorRoutes::EditorRoutes (Editor* e)
 	_model->signal_rows_reordered().connect (sigc::mem_fun (*this, &EditorRoutes::reordered));
 
 	_display.signal_button_press_event().connect (sigc::mem_fun (*this, &EditorRoutes::button_press), false);
+	_display.signal_button_release_event().connect (sigc::mem_fun (*this, &EditorRoutes::button_release), false);
 	_scroller.signal_key_press_event().connect (sigc::mem_fun(*this, &EditorRoutes::key_press), false);
 
 	_scroller.signal_focus_in_event().connect (sigc::mem_fun (*this, &EditorRoutes::focus_in), false);
@@ -1393,6 +1401,19 @@ EditorRoutes::get_relevant_routes (boost::shared_ptr<RouteList> rl)
 }
 
 bool
+EditorRoutes::select_function(const Glib::RefPtr<Gtk::TreeModel>&, const Gtk::TreeModel::Path&, bool)
+{
+	return !column_does_not_select;
+}
+
+bool
+EditorRoutes::button_release (GdkEventButton*)
+{
+	column_does_not_select = false;
+	return false;
+}
+
+bool
 EditorRoutes::button_press (GdkEventButton* ev)
 {
 	if (Keyboard::is_context_menu_event (ev)) {
@@ -1416,6 +1437,18 @@ EditorRoutes::button_press (GdkEventButton* ev)
 		return true;
 	}
 
+	if ((tvc == rec_state_column) ||
+	    (tvc == rec_safe_column) ||
+	    (tvc == input_active_column) ||
+	    (tvc == mute_state_column) ||
+	    (tvc == solo_state_column) ||
+	    (tvc == solo_safe_state_column) ||
+	    (tvc == solo_isolate_state_column) ||
+	    (tvc == visible_column) ||
+	    (tvc == active_column)) {
+		column_does_not_select = true;
+	}
+
 	//Scroll editor canvas to selected track
 	if (Keyboard::modifier_state_equals (ev->state, Keyboard::PrimaryModifier)) {
 
@@ -1433,7 +1466,7 @@ EditorRoutes::button_press (GdkEventButton* ev)
 void
 EditorRoutes::selection_changed ()
 {
-	if (_ignore_selection_change) {
+	if (_ignore_selection_change || column_does_not_select) {
 		return;
 	}
 

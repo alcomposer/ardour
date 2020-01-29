@@ -124,6 +124,9 @@ AudioClock::AudioClock (const string& clock_name, bool transient, const string& 
 		clocks.push_back (this);
 	}
 
+	_left_btn.set_name ("transport option button");
+	_right_btn.set_name ("transport option button");
+
 	_left_btn.set_sizing_text (_("0000000000000"));
 	// NB right_btn is in a size-group
 
@@ -2181,7 +2184,7 @@ AudioClock::locate ()
 		return;
 	}
 
-	_session->request_locate (current_time(), _session->transport_rolling ());
+	_session->request_locate (current_time(), RollIfAppropriate);
 }
 
 void

@@ -945,6 +945,7 @@ LuaInstance::register_classes (lua_State* L)
 		.addFunction ("copy_playlists", &PublicEditor::copy_playlists)
 		.addFunction ("clear_playlists", &PublicEditor::clear_playlists)
 
+		.addFunction ("select_all_visible_lanes", &PublicEditor::select_all_visible_lanes)
 		.addFunction ("select_all_tracks", &PublicEditor::select_all_tracks)
 		.addFunction ("deselect_all", &PublicEditor::deselect_all)
 
@@ -1432,7 +1433,7 @@ LuaInstance::session_going_away ()
 
 	lua_State* L = lua.getState();
 	LuaBindings::set_session (L, _session);
-	lua.do_command ("collectgarbage();");
+	lua.collect_garbage ();
 }
 
 void

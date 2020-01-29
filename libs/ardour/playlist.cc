@@ -3177,6 +3177,10 @@ Playlist::combine (const RegionList& r)
 
 	boost::shared_ptr<Region> compound_region = RegionFactory::create (parent_region, plist, true);
 
+	for (SourceList::iterator s = sources.begin(); s != sources.end(); ++s) {
+		boost::dynamic_pointer_cast<PlaylistSource>(*s)->set_owner (compound_region->id());
+	}
+
 	/* remove all the selected regions from the current playlist */
 
 	freeze ();
@@ -3234,7 +3238,7 @@ Playlist::uncombine (boost::shared_ptr<Region> target)
 	RegionFactory::CompoundAssociations& cassocs (RegionFactory::compound_associations());
 	sampleoffset_t move_offset = 0;
 
-	/* there are two possibilities here:
+	/* there are three possibilities here:
 	   1) the playlist that the playlist source was based on
 	   is us, so just add the originals (which belonged to
 	   us anyway) back in the right place.
@@ -3243,8 +3247,14 @@ Playlist::uncombine (boost::shared_ptr<Region> target)
 	   is NOT us, so we need to make copies of each of
 	   the original regions that we find, and add them
 	   instead.
+
+	   3) target region is a copy of a compount region previously
+	   created. In this case we will also need to make copies ot each of
+	   the original regions, and add them instead.
 	*/
-	bool same_playlist = (pls->original() == id());
+
+	const bool need_copies = (boost::dynamic_pointer_cast<PlaylistSource> (pls)->owner() != target->id()) ||
+		(pls->original() != id());
 
 	for (RegionList::const_iterator i = rl.begin(); i != rl.end(); ++i) {
 
@@ -3257,7 +3267,7 @@ Playlist::uncombine (boost::shared_ptr<Region> target)
 		}
 
 		boost::shared_ptr<Region> original (ca->second);
-		cassocs.erase(ca);
+
 		bool modified_region;
 
 		if (i == rl.begin()) {
@@ -3266,7 +3276,7 @@ Playlist::uncombine (boost::shared_ptr<Region> target)
 			adjusted_end = adjusted_start + target->length();
 		}
 
-		if (!same_playlist) {
+		if (need_copies) {
 			samplepos_t pos = original->position();
 			/* make a copy, but don't announce it */
 			original = RegionFactory::create (original, false);

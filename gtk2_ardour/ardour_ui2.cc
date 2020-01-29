@@ -95,7 +95,7 @@ ARDOUR_UI::setup_tooltips ()
 	set_tip (editor_meter_peak_display, _("Reset All Peak Meters"));
 	set_tip (error_alert_button, _("Show Error Log and acknowledge warnings"));
 
-	set_tip (latency_disable_button, _("Disable all latency compensation. This will result in playback and monitoring to not be out of sync."));
+	set_tip (latency_disable_button, _("Disable all Plugin Delay Compensation. This results in the shortest delay from live input to output, but any paths with delay-causing plugins will sound later than those without."));
 
 	synchronize_sync_source_and_video_pullup ();
 
@@ -866,7 +866,7 @@ ARDOUR_UI::sync_button_clicked (GdkEventButton* ev)
 	}
 
 	show_tabbable (rc_option_editor);
-	rc_option_editor->set_current_page (_("Sync"));
+	rc_option_editor->set_current_page (_("Transport"));
 	return true;
 }
 

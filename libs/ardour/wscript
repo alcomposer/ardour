@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from waflib.extras import autowaf as autowaf
-from waflib import Options
+from waflib import Options, Task, Tools
 import os
 import sys
 import re
@@ -373,6 +373,11 @@ def build(bld):
     # micro increment <=> no interface changes
     LIBARDOUR_LIB_VERSION = "3.0.0"
 
+    # remove '${DEFINES_ST:DEFINES}' from run_str.
+    # x86_64-w64-mingw32-as (mingw) -D flag is for debug messages
+    if bld.env['build_target'] == 'mingw':
+        class asm(Task.classes['asm']): run_str = '${AS} ${ASFLAGS} ${ASMPATH_ST:INCPATHS} ${AS_SRC_F}${SRC} ${AS_TGT_F}${TGT}'
+
     # operate on copy to avoid adding sources twice
     sources = list(libardour_sources)
 
@@ -383,7 +388,7 @@ def build(bld):
         obj.defines      = [ 'LIBARDOUR_DLL_EXPORTS=1' ]
     else:
         obj              = bld.stlib(features = 'c cxx cstlib cxxstlib', source=sources)
-        obj.cxxflags     = [  bld.env['compiler_flags_dict']['pic'] ]
+        obj.cxxflags     = [ bld.env['compiler_flags_dict']['pic'] ]
         obj.cflags       = [ bld.env['compiler_flags_dict']['pic'] ]
         obj.defines      = []
 
@@ -479,7 +484,7 @@ def build(bld):
             avx_cxxflags = list(bld.env['CXXFLAGS'])
             avx_cxxflags.append (bld.env['compiler_flags_dict']['avx'])
             avx_cxxflags.append (bld.env['compiler_flags_dict']['pic'])
-            bld(features = 'cxx',
+            bld(features = 'cxx cxxstlib asm',
                 source   = avx_sources,
                 cxxflags = avx_cxxflags,
                 includes = [ '.' ],
@@ -504,7 +509,7 @@ def build(bld):
         testcommon.includes     = obj.includes + ['test', '../pbd', '..']
         testcommon.source       = ['test/testrunner.cc', 'test/test_needing_session.cc',
                                    'test/dummy_lxvst.cc', 'test/audio_region_test.cc', 'test/test_util.cc', 'test/test_ui.cc']
-        testcommon.uselib       = ['CPPUNIT','SIGCPP','GLIBMM','GTHREAD',
+        testcommon.uselib       = ['CPPUNIT','SIGCPP','GLIBMM','GTHREAD', 'OSX',
                                    'SAMPLERATE','XML','LRDF','COREAUDIO','TAGLIB','VAMPSDK','VAMPHOSTSDK','RUBBERBAND']
         testcommon.use          = ['libpbd','libmidipp','libevoral',
                                    'libaudiographer','libardour']

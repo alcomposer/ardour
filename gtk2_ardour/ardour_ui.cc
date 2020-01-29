@@ -1348,11 +1348,12 @@ ARDOUR_UI::update_timecode_format ()
 		boost::shared_ptr<TimecodeTransportMaster> tcmaster;
 		boost::shared_ptr<TransportMaster> tm = TransportMasterManager::instance().current();
 
-		if ((tm->type() == LTC || tm->type() == MTC) && (tcmaster = boost::dynamic_pointer_cast<TimecodeTransportMaster>(tm)) != 0) {
+		if ((tm->type() == LTC || tm->type() == MTC) && (tcmaster = boost::dynamic_pointer_cast<TimecodeTransportMaster>(tm)) != 0 && tm->locked()) {
 			matching = (tcmaster->apparent_timecode_format() == _session->config.get_timecode_format());
 		} else {
 			matching = true;
 		}
+
 
 		snprintf (buf, sizeof (buf), S_("Timecode|TC: <span foreground=\"%s\">%s</span>"),
 			  matching ? X_("green") : X_("red"),
@@ -1610,7 +1611,7 @@ ARDOUR_UI::transport_goto_wallclock ()
 		samples += tmnow.tm_min * (60 * sample_rate);
 		samples += tmnow.tm_sec * sample_rate;
 
-		_session->request_locate (samples, _session->transport_rolling ());
+		_session->request_locate (samples, RollIfAppropriate);
 
 		/* force displayed area in editor to start no matter
 		   what "follow playhead" setting is.
@@ -1828,7 +1829,7 @@ ARDOUR_UI::toggle_roll (bool with_abort, bool roll_out_of_bounded_mode)
 		}
 
 		if (_session->get_play_loop() && Config->get_loop_is_mode()) {
-			_session->request_locate (_session->locations()->auto_loop_location()->start(), true);
+			_session->request_locate (_session->locations()->auto_loop_location()->start(), MustRoll);
 		} else {
 			if (UIConfiguration::instance().get_follow_edits()) {
 				list<AudioRange>& range = editor->get_selection().time;
@@ -2803,11 +2804,11 @@ ARDOUR_UI::pending_state_dialog ()
 	Image* image = manage (new Image (Stock::DIALOG_QUESTION, ICON_SIZE_DIALOG));
 	ArdourDialog dialog (_("Crash Recovery"), true);
 	Label  message (string_compose (_("\
-This session appears to have been in the\n\
-middle of recording when %1 or\n\
-the computer was shutdown.\n\
+This session appears to have been modified\n\
+without save, or in middle of recording when\n\
+%1 or the computer was shutdown.\n\
 \n\
-%1 can recover any captured audio for\n\
+%1 can recover any changes for\n\
 you, or it can ignore it. Please decide\n\
 what you would like to do.\n"), PROGRAM_NAME));
 	image->set_alignment(ALIGN_CENTER, ALIGN_TOP);

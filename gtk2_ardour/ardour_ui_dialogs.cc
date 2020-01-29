@@ -98,6 +98,19 @@ ARDOUR_UI::set_session (Session *s)
 {
 	SessionHandlePtr::set_session (s);
 
+	/* adjust sensitivity of menu bar options to reflect presence/absence
+	 * of session
+	 */
+
+	ActionManager::set_sensitive (ActionManager::session_sensitive_actions, _session);
+	ActionManager::set_sensitive (ActionManager::write_sensitive_actions, _session ? _session->writable() : false);
+
+	if (_session && _session->locations()->num_range_markers()) {
+		ActionManager::set_sensitive (ActionManager::range_sensitive_actions, true);
+	} else {
+		ActionManager::set_sensitive (ActionManager::range_sensitive_actions, false);
+	}
+
 	transport_ctrl.set_session (s);
 
 	if (big_transport_window) {
@@ -147,17 +160,6 @@ ARDOUR_UI::set_session (Session *s)
 	plugin_dsp_load_window->set_session (s);
 	transport_masters_window->set_session (s);
 	rc_option_editor->set_session (s);
-
-	/* sensitize menu bar options that are now valid */
-
-	ActionManager::set_sensitive (ActionManager::session_sensitive_actions, true);
-	ActionManager::set_sensitive (ActionManager::write_sensitive_actions, _session->writable());
-
-	if (_session->locations()->num_range_markers()) {
-		ActionManager::set_sensitive (ActionManager::range_sensitive_actions, true);
-	} else {
-		ActionManager::set_sensitive (ActionManager::range_sensitive_actions, false);
-	}
 
 	/* allow wastebasket flush again */
 
@@ -233,11 +235,13 @@ ARDOUR_UI::set_session (Session *s)
 		editor_meter_table.remove(*editor_meter);
 		delete editor_meter;
 		editor_meter = 0;
-		editor_meter_peak_display.hide();
 	}
 
 	if (editor_meter_table.get_parent()) {
 		transport_hbox.remove (editor_meter_table);
+	}
+	if (editor_meter_peak_display.get_parent ()) {
+		editor_meter_table.remove (editor_meter_peak_display);
 	}
 
 	if (_session &&
