@@ -90,8 +90,8 @@ PianoRollHeader::PianoRollHeader(MidiStreamView& v)
 	_big_c_layout->set_font_description(_font_descript_big_c);
 
 	_midnam_layout = Pango::Layout::create (get_pango_context());
-	pango_layout_set_ellipsize (_midnam_layout->gobj (), PANGO_ELLIPSIZE_END);
-	pango_layout_set_width (_midnam_layout->gobj (), (_scroomer_size - 2) * Pango::SCALE);
+	//pango_layout_set_ellipsize (_midnam_layout->gobj (), PANGO_ELLIPSIZE_END);
+	//pango_layout_set_width (_midnam_layout->gobj (), (_scroomer_size - 2) * Pango::SCALE);
 
 	_adj.set_lower(0);
 	_adj.set_upper(127);
@@ -241,8 +241,6 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	//}
 	//_old_av_note_height = av_note_height;
 
-	render_scroomer(cr);
-
 	lowest = max(_view.lowest_note(), _view.y_to_note(y2));
 	highest = min(_view.highest_note(), _view.y_to_note(y1));
 
@@ -267,6 +265,33 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	cr->move_to(get_width(),rect.y);
 	cr->line_to(get_width(), rect.y + get_height ());
 	cr->stroke();
+
+	cr->save();
+
+	//midnam rendering
+	cr->rectangle (0,0,_scroomer_size, get_height () );
+	cr->clip();
+	for (int i = lowest; i <= highest; ++i) {
+		double y = floor(_view.note_to_y(i)) - 0.5f;
+		if (true) {
+			_midnam_layout->set_text (get_note_name(i));
+			cr->set_source_rgb(white.r, white.g, white.b);
+			cr->move_to(2.f, y);
+			_midnam_layout->show_in_cairo_context (cr);
+		}
+	}
+
+	auto gradient_ptr = Cairo::LinearGradient::create (55, 0, _scroomer_size, 0);
+	gradient_ptr->add_color_stop_rgba (0,.23,.23,.23,0);
+    gradient_ptr->add_color_stop_rgba (1,.23,.23,.23,1);
+	cr->set_source (gradient_ptr);
+    cr->rectangle (55, 0, _scroomer_size, get_height () );
+    cr->fill();
+
+	render_scroomer(cr);
+
+	cr->restore();
+
 
 	for (int i = lowest; i <= highest; ++i) {
 		oct_rel = i % 12;
@@ -354,13 +379,6 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 				cr->stroke();
 
 			}
-		}
-		/* render MIDNAM */
-		if (true) {
-			_midnam_layout->set_text (get_note_name(i));
-			av_note_height > 12.0? cr->set_source_rgb(white.r, white.g, white.b) : cr->set_source_rgb(gray.r, gray.g, gray.b);
-			cr->move_to(2.f, y);
-			_midnam_layout->show_in_cairo_context (cr);
 		}
 	}
 	return true;
