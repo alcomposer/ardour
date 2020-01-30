@@ -328,9 +328,11 @@ MidiTimeAxisView::set_route (boost::shared_ptr<Route> rt)
 		_midnam_channel_selector.append_text_item(std::to_string(i));
 	}
 	_midnam_channel_selector.StateChanged.connect (sigc::mem_fun (*this, &MidiTimeAxisView::_midnam_channel_changed));
-	_midnam_channel_selector.set_active("1");
 	if (gui_property (X_("midnam-channel")).empty()) {
 		set_gui_property (X_("midnam-channel"), "1");
+		_midnam_channel_selector.set_active("1");
+	} else {
+		_midnam_channel_selector.set_active(gui_property (X_("midnam-channel")));
 	}
 }
 
