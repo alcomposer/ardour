@@ -346,13 +346,19 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 		break;
 
 		}
+	}
+	/* render the C<N> of the key, when key is too small to contain text we
+	   place the C<N> on the midnam scroomer area.
 
-
+	   we render an additional 5 notes below the lowest note displayed
+	   so that the top of the C is shown to maintain visual context
+	 */
+	for (int i = lowest - 5; i <= highest; ++i) {
 		double y = floor(_view.note_to_y(i)) - 0.5f;
 		double note_height = floor(_view.note_to_y(i - 1)) - y;
 		int lw, lh;
+		oct_rel = i % 12;
 
-		/* render the name of which C this is */
 		if (oct_rel == 0) {
 			std::stringstream s;
 
