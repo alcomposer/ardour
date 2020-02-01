@@ -355,7 +355,7 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	 */
 	for (int i = lowest - 5; i <= highest; ++i) {
 		double y = floor(_view.note_to_y(i)) - 0.5f;
-		double note_height = floor(_view.note_to_y(i - 1)) - y;
+		double note_height = i == 0? av_note_height : floor(_view.note_to_y(i - 1)) - y;
 		int lw, lh;
 		oct_rel = i % 12;
 
@@ -379,7 +379,6 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 				cr->move_to(_scroomer_size - 18, y + note_height);
 				cr->line_to(_scroomer_size, y + note_height);
 				cr->stroke();
-
 			}
 		}
 	}
