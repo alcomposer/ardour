@@ -455,6 +455,12 @@ PianoRollHeader::get_note_name (int note)
 bool
 PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 {
+	if (ev->x < _scroomer_size){
+		Gdk::Cursor m_Cursor (Gdk::HAND2);
+		get_window()->set_cursor(m_Cursor);
+	} else if (!_scroomer_drag){
+		get_window()->set_cursor();
+	}
 	if (_scroomer_drag){
 		double pixel2val = 127.0 / get_height();
 		double delta = _old_y - ev->y;
@@ -618,6 +624,9 @@ PianoRollHeader::on_enter_notify_event (GdkEventCrossing* ev)
 bool
 PianoRollHeader::on_leave_notify_event (GdkEventCrossing*)
 {
+	if (!_scroomer_drag){
+		get_window()->set_cursor();
+	}
 	invalidate_note_range(_highlighted_note, _highlighted_note);
 
 	if (_clicked_note != NO_MIDI_NOTE) {
