@@ -456,7 +456,16 @@ bool
 PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 {
 	if (ev->x < _scroomer_size){
-		Gdk::Cursor m_Cursor (Gdk::HAND2);
+		Gdk::Cursor m_Cursor;
+		double scroomer_top = max(1.0, (1.0 - ((_adj.get_value()+_adj.get_page_size()) / 127.0)) * get_height () );
+		double scroomer_bottom = (1.0 - (_adj.get_value () / 127.0)) * get_height ();
+		if (ev->y > scroomer_top - 5 && ev->y < scroomer_top + 5){
+			m_Cursor = Gdk::Cursor (Gdk::TOP_SIDE);
+		}else if (ev->y > scroomer_bottom - 5 && ev->y < scroomer_bottom + 5){
+			m_Cursor = Gdk::Cursor (Gdk::BOTTOM_SIDE);
+		}else{
+			m_Cursor = Gdk::Cursor (Gdk::DOUBLE_ARROW);
+		};
 		get_window()->set_cursor(m_Cursor);
 	} else if (!_scroomer_drag){
 		get_window()->set_cursor();
