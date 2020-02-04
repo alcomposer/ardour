@@ -124,6 +124,7 @@ private:
   double _fract;
   double _fract_top;
   double _raw_note_height;
+  double _min_page_size;
   enum scr_pos {TOP, BOTTOM, MOVE, NONE};
   scr_pos _scroomer_state;
   scr_pos _scroomer_button_state;
