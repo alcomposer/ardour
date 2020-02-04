@@ -128,6 +128,8 @@ private:
   enum scr_pos {TOP, BOTTOM, MOVE, NONE};
   scr_pos _scroomer_state;
   scr_pos _scroomer_button_state;
+  double _saved_top_val;
+  double _saved_bottom_val;
 
 	double _note_height;
   double _old_av_note_height;

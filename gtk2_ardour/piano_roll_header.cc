@@ -83,6 +83,8 @@ PianoRollHeader::PianoRollHeader(MidiStreamView& v)
 	, _font_descript_midnam("Sans")
 	, _scroomer_state(NONE)
 	, _scroomer_button_state(NONE)
+	, _saved_bottom_val(127.0)
+	, _saved_top_val(0.0)
 {
 	_layout = Pango::Layout::create (get_pango_context());
 	_big_c_layout = Pango::Layout::create (get_pango_context());
@@ -456,50 +458,55 @@ PianoRollHeader::get_note_name (int note)
 bool
 PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 {
-	if (ev->x < _scroomer_size){
+	if (!_scroomer_drag && ev->x < _scroomer_size){
 		Gdk::Cursor m_Cursor;
 		double scroomer_top = max(1.0, (1.0 - ((_adj.get_value()+_adj.get_page_size()) / 127.0)) * get_height () );
 		double scroomer_bottom = (1.0 - (_adj.get_value () / 127.0)) * get_height ();
 		if (ev->y > scroomer_top - 5 && ev->y < scroomer_top + 5){
 			m_Cursor = Gdk::Cursor (Gdk::TOP_SIDE);
+			get_window()->set_cursor(m_Cursor);
 			_scroomer_state = TOP;
 		}else if (ev->y > scroomer_bottom - 5 && ev->y < scroomer_bottom + 5){
 			m_Cursor = Gdk::Cursor (Gdk::BOTTOM_SIDE);
+			get_window()->set_cursor(m_Cursor);
 			_scroomer_state = BOTTOM;
 		}else {
 			_scroomer_state = MOVE;
+			get_window()->set_cursor();
 		}
-		get_window()->set_cursor(m_Cursor);
-	} else if (!_scroomer_drag){
-		get_window()->set_cursor();
 	}
 
 	if (_scroomer_drag){
 		double pixel2val = 127.0 / get_height();
 		double delta = _old_y - ev->y;
 		double val_at_pointer = (delta * pixel2val);
+		double real_val_at_pointer = 127.0 - (ev->y * pixel2val);
 		double note_range = _adj.get_page_size ();
 
 		switch (_scroomer_button_state){
 			case MOVE:
 				_fract += val_at_pointer;
 				_fract = (_fract + note_range > 127.0)? 127.0 - note_range : _fract;
-				_fract = (_fract < 0.0)? 0.0 : _fract;
+				_fract = max(0.0, _fract);
 				_adj.set_value (min(_fract, 127.0 - note_range));
 				break;
 			case TOP:
-				_fract_top += val_at_pointer;
-				_fract_top = (_fract_top > 127.0)? 127.0 : _fract_top;
+				real_val_at_pointer = real_val_at_pointer <= _saved_top_val? _adj.get_value() + _adj.get_page_size() : real_val_at_pointer;
+				real_val_at_pointer = min(127.0, real_val_at_pointer);
+				if (_note_height >= 18.5){
+					_saved_top_val  = min(_adj.get_value() + _adj.get_page_size (), 127.0);
+				}else _saved_top_val = 0.0;
 				//if we are at largest note size & the user is moving down don't do anything
 				//FIXME we are using a heuristic of 18.5 for max note size, but this changes when track size is small to 19.5?
-				_fract_top = (_note_height >= 18.5 && val_at_pointer < 0.0)? _adj.get_value () + _adj.get_page_size (): _fract_top;
-				_view.apply_note_range (_adj.get_value (), _fract_top, true);
+				_view.apply_note_range (_adj.get_value (), real_val_at_pointer, true);
 				break;
 			case BOTTOM:
-				_fract += val_at_pointer;
-				_fract = (_note_height >= 18.5 && val_at_pointer > 0.0)? _adj.get_value () : _fract;
-				_fract = (_fract < 0.0 )? 0.0 : _fract;
-				_view.apply_note_range (_fract, _adj.get_value () + _adj.get_page_size (), true);
+				real_val_at_pointer = max(0.0, real_val_at_pointer);
+				real_val_at_pointer = real_val_at_pointer >= _saved_bottom_val? _adj.get_value() : real_val_at_pointer;
+				if (_note_height >= 18.5){
+					_saved_bottom_val  = _adj.get_value();
+				}else _saved_bottom_val = 127.0;
+				_view.apply_note_range (real_val_at_pointer, _adj.get_value () + _adj.get_page_size (), true);
 				break;
 			default:
 				break;
