@@ -480,16 +480,26 @@ PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 		double val_at_pointer = (delta * pixel2val);
 		double note_range = _adj.get_page_size ();
 
-		_fract += val_at_pointer;
-
-		_fract = (_fract + note_range > 127.0)? 127.0 - note_range : _fract;
-		_fract = (_fract < 0.0)? 0.0 : _fract;
 		switch (_scroomer_button_state){
 			case MOVE:
+				_fract += val_at_pointer;
+				_fract = (_fract + note_range > 127.0)? 127.0 - note_range : _fract;
+				_fract = (_fract < 0.0)? 0.0 : _fract;
 				_adj.set_value (min(_fract, 127.0 - note_range));
 				break;
 			case TOP:
-				_view.apply_note_range (_adj.get_value(), min(_fract, 127.0), true);
+				_fract_top += val_at_pointer;
+				_fract_top = (_fract_top > 127.0)? 127.0 : _fract_top;
+				//if we are at largest note size & the user is moving down don't do anything
+				//FIXME we are using a heuristic of 18.5 for max note size, but this changes when track size is small to 19.5?
+				_fract_top = (_note_height >= 18.5 && val_at_pointer < 0.0)? _adj.get_value () + _adj.get_page_size (): _fract_top;
+				_view.apply_note_range (_adj.get_value (), _fract_top, true);
+				break;
+			case BOTTOM:
+				_fract += val_at_pointer;
+				_fract = (_note_height >= 18.5 && val_at_pointer > 0.0)? _adj.get_value () : _fract;
+				_fract = (_fract < 0.0 )? 0.0 : _fract;
+				_view.apply_note_range (_fract, _adj.get_value () + _adj.get_page_size (), true);
 				break;
 			default:
 				break;
@@ -541,6 +551,7 @@ PianoRollHeader::on_button_press_event (GdkEventButton* ev)
 		_scroomer_drag = true;
 		_old_y = ev->y;
 		_fract = _adj.get_value();
+		_fract_top = _adj.get_value() + _adj.get_page_size();
 		return true;
 	}else {
 		int note = _view.y_to_note(ev->y);
@@ -747,4 +758,5 @@ PianoRollHeader::editor() const
 void
 PianoRollHeader::set_min_page_size(double page_size)
 {
+	_min_page_size = page_size;
 };

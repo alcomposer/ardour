@@ -122,6 +122,7 @@ private:
   bool _scroomer_drag;
   double _old_y;
   double _fract;
+  double _fract_top;
   double _raw_note_height;
   enum scr_pos {TOP, BOTTOM, MOVE, NONE};
   scr_pos _scroomer_state;
