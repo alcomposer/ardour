@@ -81,8 +81,9 @@ PianoRollHeader::PianoRollHeader(MidiStreamView& v)
 	, _font_descript("Sans Bold")
 	, _font_descript_big_c("Sans")
 	, _font_descript_midnam("Sans")
+	, _scroomer_state(NONE)
+	, _scroomer_button_state(NONE)
 {
-
 	_layout = Pango::Layout::create (get_pango_context());
 	_big_c_layout = Pango::Layout::create (get_pango_context());
 	_font_descript_big_c.set_absolute_size (10.0 * Pango::SCALE);
@@ -461,15 +462,18 @@ PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 		double scroomer_bottom = (1.0 - (_adj.get_value () / 127.0)) * get_height ();
 		if (ev->y > scroomer_top - 5 && ev->y < scroomer_top + 5){
 			m_Cursor = Gdk::Cursor (Gdk::TOP_SIDE);
+			_scroomer_state = TOP;
 		}else if (ev->y > scroomer_bottom - 5 && ev->y < scroomer_bottom + 5){
 			m_Cursor = Gdk::Cursor (Gdk::BOTTOM_SIDE);
-		}else{
-			m_Cursor = Gdk::Cursor (Gdk::DOUBLE_ARROW);
-		};
+			_scroomer_state = BOTTOM;
+		}else {
+			_scroomer_state = MOVE;
+		}
 		get_window()->set_cursor(m_Cursor);
 	} else if (!_scroomer_drag){
 		get_window()->set_cursor();
 	}
+
 	if (_scroomer_drag){
 		double pixel2val = 127.0 / get_height();
 		double delta = _old_y - ev->y;
@@ -480,8 +484,16 @@ PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 
 		_fract = (_fract + note_range > 127.0)? 127.0 - note_range : _fract;
 		_fract = (_fract < 0.0)? 0.0 : _fract;
-
-		_adj.set_value (min(_fract, 127.0 - note_range));
+		switch (_scroomer_button_state){
+			case MOVE:
+				_adj.set_value (min(_fract, 127.0 - note_range));
+				break;
+			case TOP:
+				_view.apply_note_range (_adj.get_value(), min(_fract, 127.0), true);
+				break;
+			default:
+				break;
+		}
 	}else{
 		int note = _view.y_to_note(ev->y);
 		set_note_highlight (note);
@@ -524,6 +536,7 @@ PianoRollHeader::on_motion_notify_event (GdkEventMotion* ev)
 bool
 PianoRollHeader::on_button_press_event (GdkEventButton* ev)
 {
+	_scroomer_button_state = _scroomer_state;
 	if (ev->button == 1 && ev->x <= _scroomer_size){
 		_scroomer_drag = true;
 		_old_y = ev->y;
