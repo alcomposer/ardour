@@ -231,20 +231,19 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 
 	//Reduce the frequency of Pango layout resizing
 	//if (int(_old_av_note_height) != int(av_note_height)) {
-		//Set Pango layout keyboard c's size
-		_font_descript.set_absolute_size (av_note_height * 0.7 * Pango::SCALE);
-		_layout->set_font_description(_font_descript);
+	//Set Pango layout keyboard c's size
+	_font_descript.set_absolute_size (av_note_height * 0.7 * Pango::SCALE);
+	_layout->set_font_description(_font_descript);
 
-		//Set Pango layout midnam size
-		if (_note_height > 8.0){
+	//change mode of midnam display
+	if (av_note_height >= 8.0){
 		_mini_map_display = false;
-		} else _mini_map_display = true;
+	} else _mini_map_display = true;
 
-		_font_descript_midnam.set_absolute_size (max(8.0 * Pango::SCALE, (int)av_note_height * 0.7 * Pango::SCALE));
+	//Set Pango layout midnam size
+	_font_descript_midnam.set_absolute_size (max(8.0 * 0.7 * Pango::SCALE, (int)av_note_height * 0.7 * Pango::SCALE));
 
-		_midnam_layout->set_font_description(_font_descript_midnam);
-	//}
-	//_old_av_note_height = av_note_height;
+	_midnam_layout->set_font_description(_font_descript_midnam);
 
 	lowest = max(_view.lowest_note(), _view.y_to_note(y2));
 	highest = min(_view.highest_note(), _view.y_to_note(y1));
