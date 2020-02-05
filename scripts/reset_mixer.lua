@@ -31,7 +31,9 @@ function factory() return function()
 
 		{type="heading", align="center", colspan="3", title="Misc." },
 		{type="checkbox", key="auto",    colspan="3", title = "Automation (switch to manual mode)" },
+		{type="checkbox", key="rec",    colspan="3", title = "Disable Record" },
 		{type="checkbox", key="groups",  colspan="3", title = "Groups"                             },
+		{type="checkbox", key="vcas",    colspan="3", title = "VCAs (unassign all)"                },
 	}
 
 	function reset(ctrl, disp, auto)
@@ -108,44 +110,72 @@ function factory() return function()
 		until route:send_enable_controllable(i):isnil()
 	end
 
-	function reset_plugins(route, prefs)
+	function reset_plugin_automation(plugin, state)
+		if plugin:to_insert():isnil() then
+			return
+		end
+
+		local plugin = plugin:to_insert()
+		local pc = plugin:plugin(0):parameter_count()
+		for c = 0, pc do
+			local ac = plugin:to_automatable():automation_control(Evoral.Parameter(ARDOUR.AutomationType.PluginAutomation, 0, c), false)
+			if not(ac:isnil()) then
+				ac:set_automation_state(state)
+			end
+		end
+	end
+
+	function reset_plugins(route, prefs, auto)
 		if route:isnil() then
 			return
 		end
 
 		local i = 0
+		local queue = {}
 		repeat
+			-- Plugins are queued to not invalidate this loop
 			local proc = route:nth_processor(i)
 			if not(proc:isnil()) then
-
+				if prefs["auto"] then
+					reset_plugin_automation(proc, auto)
+				end
 				if prefs["plugins"] then
 					local insert = proc:to_insert()
 					if not(insert:isnil()) then
 						if insert:is_channelstrip() or not(insert:display_to_user()) then
 							ARDOUR.LuaAPI.reset_processor_to_default(insert)
 						else
-							if prefs["plugins"] == "remove" then
-								route:remove_processor(proc, nil, true)
-							else
-								insert:deactivate()
-							end
+							queue[#queue + 1] = proc
 						end
 					end
 				end
-
 				if prefs["io"] then
 					local io_proc = proc:to_ioprocessor()
 					if not(io_proc:isnil()) then
-						if prefs["io"] == "remove" then
-							route:remove_processor(proc, nil, true)
-						else
-							io_proc:deactivate()
-						end
+						queue[#queue + 1] = proc
 					end
 				end
 			end
 			i = i + 1
 		until proc:isnil()
+		
+		-- Deal with queue now
+		for _, proc in pairs(queue) do
+			if not(proc:to_insert():isnil()) then
+				if prefs["plugins"] == "remove" then
+					route:remove_processor(proc, nil, true)
+				elseif prefs["plugins"] == "bypass" then
+					proc:deactivate()
+				end
+			end
+			if not(proc:to_ioprocessor():isnil()) then
+				if prefs["io"] == "remove" then
+					route:remove_processor(proc, nil, true)
+				elseif prefs["io"] == "bypass" then
+					proc:deactivate()
+				end
+			end
+		end
 	end
 
 	local pref = LuaDialog.Dialog("Reset Mixer", dlg):run()
@@ -164,7 +194,12 @@ function factory() return function()
 		if pref["eq"]    then reset_eq_controls(route, disp, auto) end
 		if pref["comp"]  then reset_comp_controls(route, disp, auto) end
 		if pref["sends"] then reset_send_controls(route, disp, auto) end
-		reset_plugins(route, pref)
+		reset_plugins(route, pref, auto)
+
+		if pref["rec"] then
+			reset(route:rec_enable_control(), disp, auto)
+			reset(route:rec_safe_control(), disp, auto)
+		end
 
 		if pref["fader"] then
 			reset(route:gain_control(), disp, auto)
@@ -192,6 +227,15 @@ function factory() return function()
 			reset(route:pan_frontback_control(), disp, auto)
 			reset(route:pan_lfe_control(), disp, auto)
 			reset(route:pan_width_control(), disp, auto)
+		end
+
+		if pref["vcas"] then
+			local slave = route:to_slavable()
+			if not(slave:isnil()) then
+				for vca in Session:vca_manager():vcas():iter() do
+					slave:unassign(vca)
+				end
+			end
 		end
 	end
 
