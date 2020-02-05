@@ -284,9 +284,10 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 		cr->move_to(2.f, y);
 		if (!_mini_map_display) {
 			_midnam_layout->show_in_cairo_context (cr);
-		}else if (note.from_midnam) {
+		}else {
+			if (!note.from_midnam) cr->set_source_rgb(gray.r, gray.g, gray.b);
 			pango_layout_get_pixel_size (_midnam_layout->gobj (), &size_x, &size_y);
-			cr->rectangle (2.f, y + (av_note_height * 0.5), size_x, av_note_height * 0.1);
+			cr->rectangle (2.f, y + (av_note_height * 0.5), size_x, av_note_height * 0.2);
 			cr->fill ();
 		}
 	}
