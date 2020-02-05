@@ -85,6 +85,7 @@ PianoRollHeader::PianoRollHeader(MidiStreamView& v)
 	, _scroomer_button_state(NONE)
 	, _saved_bottom_val(127.0)
 	, _saved_top_val(0.0)
+	, _mini_map_display(false)
 {
 	_layout = Pango::Layout::create (get_pango_context());
 	_big_c_layout = Pango::Layout::create (get_pango_context());
@@ -235,7 +236,12 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 		_layout->set_font_description(_font_descript);
 
 		//Set Pango layout midnam size
-		_font_descript_midnam.set_absolute_size ((int)av_note_height * 0.7 * Pango::SCALE);
+		if (_note_height > 8.0){
+		_mini_map_display = false;
+		} else _mini_map_display = true;
+
+		_font_descript_midnam.set_absolute_size (max(8.0 * Pango::SCALE, (int)av_note_height * 0.7 * Pango::SCALE));
+
 		_midnam_layout->set_font_description(_font_descript_midnam);
 	//}
 	//_old_av_note_height = av_note_height;
@@ -271,12 +277,18 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	cr->rectangle (0,0,_scroomer_size, get_height () );
 	cr->clip();
 	for (int i = lowest; i <= highest; ++i) {
+		int size_x, size_y;
 		double y = floor(_view.note_to_y(i)) - 0.5f;
-		if (true) {
-			_midnam_layout->set_text (get_note_name(i));
-			cr->set_source_rgb(white.r, white.g, white.b);
-			cr->move_to(2.f, y);
+		midnamName note = get_note_name (i);
+		_midnam_layout->set_text (note.name);
+		cr->set_source_rgb(white.r, white.g, white.b);
+		cr->move_to(2.f, y);
+		if (!_mini_map_display) {
 			_midnam_layout->show_in_cairo_context (cr);
+		}else if (note.from_midnam) {
+			pango_layout_get_pixel_size (_midnam_layout->gobj (), &size_x, &size_y);
+			cr->rectangle (2.f, y + (av_note_height * 0.5), size_x, av_note_height * 0.1);
+			cr->fill ();
 		}
 	}
 
@@ -388,13 +400,13 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 	return true;
 }
 
-std::string
+PianoRollHeader::midnamName
 PianoRollHeader::get_note_name (int note)
 {
 	using namespace MIDI::Name;
 	std::string name;
 	std::string note_n;
-	std::string rtn;
+	midnamName rtn;
 
 	MidiTimeAxisView* mtv = dynamic_cast<MidiTimeAxisView*>(&_view.trackview());
 	if (mtv) {
@@ -451,7 +463,8 @@ PianoRollHeader::get_note_name (int note)
 	}
 
 	std::string new_string = std::string(3 - std::to_string(note).length(), '0') + std::to_string(note);
-	rtn = name.empty()? new_string + " " + note_n : name;
+	rtn.name = name.empty()? new_string + " " + note_n : name;
+	rtn.from_midnam = !name.empty();
 	return rtn;
 }
 

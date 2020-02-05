@@ -65,9 +65,13 @@ public:
 	sigc::signal<void,uint8_t> ExtendNoteSelection;
 
 private:
+  struct midnamName {
+  std::string name;
+  bool from_midnam;
+};
   void set_min_page_size(double page_size);
   void render_scroomer(Cairo::RefPtr<Cairo::Context>);
-  std::string get_note_name (int note);
+  midnamName get_note_name (int note);
 
   Gtk::Adjustment& _adj;
 	static Color white;
@@ -130,6 +134,7 @@ private:
   scr_pos _scroomer_button_state;
   double _saved_top_val;
   double _saved_bottom_val;
+  bool _mini_map_display;
 
 	double _note_height;
   double _old_av_note_height;
