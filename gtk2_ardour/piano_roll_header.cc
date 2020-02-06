@@ -179,7 +179,7 @@ PianoRollHeader::on_scroll_event (GdkEventScroll* ev)
 			return false;
 		}
 	}
-	//std::cout << "hilight_note: " << std::to_string(_highlighted_note) << " Hov_Note: " << std::to_string(_view.y_to_note(ev->y)) << " Val: " << _adj.get_value() << " upper: " << _adj.get_upper() << " lower: " << _adj.get_lower() << " page_size: "<< _adj.get_page_size () << std::endl;
+	std::cout << "hilight_note: " << std::to_string(_highlighted_note) << " Hov_Note: " << std::to_string(_view.y_to_note(ev->y)) << " Val: " << _adj.get_value() << " upper: " << _adj.get_upper() << " lower: " << _adj.get_lower() << " page_size: "<< _adj.get_page_size () << std::endl;
 	_adj.value_changed ();
 	queue_draw ();
 	return true;
@@ -374,11 +374,16 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 		int lw, lh;
 		oct_rel = i % 12;
 
-		if (oct_rel == 0) {
+		if (oct_rel == 0 || (oct_rel == 7 && _adj.get_page_size() <=10) ) {
 			std::stringstream s;
 
 			int cn = i / 12 - 1;
-			s << "C" << cn;
+
+			if (oct_rel == 0){
+				s << "C" << cn;
+			}else{
+				s << "G" << cn;
+			}
 
 			if (av_note_height > 12.0){
 				cr->set_source_rgb(0.30f, 0.30f, 0.30f);
