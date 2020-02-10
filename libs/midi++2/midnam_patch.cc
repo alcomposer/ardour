@@ -678,6 +678,8 @@ boost::shared_ptr<ChannelNameSet>
 MasterDeviceNames::channel_name_set_by_channel(const std::string& mode, uint8_t channel)
 {
 	boost::shared_ptr<CustomDeviceMode> cdm = custom_device_mode_by_name(mode);
+	if (!cdm) return boost::shared_ptr<ChannelNameSet>();
+
 	boost::shared_ptr<ChannelNameSet> cns =  _channel_name_sets[cdm->channel_name_set_name_by_channel(channel)];
 	return cns;
 }
