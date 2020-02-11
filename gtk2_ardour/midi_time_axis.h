@@ -124,10 +124,11 @@ private:
 
 	void setup_midnam_patches ();
 	void update_patch_selector ();
+  void set_default ();
 
 	sigc::connection _note_range_changed_connection;
 
-	void maybe_trigger_model_change ();
+	void trigger_model_change ();
 	void model_changed(const std::string& model);
 	void custom_device_mode_changed(const std::string& mode);
 
