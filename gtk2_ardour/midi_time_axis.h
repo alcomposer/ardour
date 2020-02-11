@@ -190,6 +190,9 @@ private:
 
 	void ensure_step_editor ();
 
+  std::string _current_model;
+  std::string _current_mode;
+
 	/** parameter -> menu item map for the channel command items */
 	ParameterMenuMap _channel_command_menu_map;
 	/** parameter -> menu item map for the controller menu */

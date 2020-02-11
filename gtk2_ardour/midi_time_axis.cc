@@ -253,20 +253,6 @@ MidiTimeAxisView::set_route (boost::shared_ptr<Route> rt)
 		}
 	}
 
-	//if (gui_property (X_("midnam-model-name")).empty()) {
-	//	boost::shared_ptr<PluginInsert> pi = boost::dynamic_pointer_cast<PluginInsert> (_route->the_instrument ());
-	//	if (!pi || !pi->plugin ()->has_midnam ()) {
-	//		set_gui_property (X_("midnam-model-name"), "Generic");
-	//	}
-	//}
-
-	//if (gui_property (X_("midnam-custom-device-mode")).empty()) {
-	//	boost::shared_ptr<MIDI::Name::MasterDeviceNames> device_names = get_device_names();
-	//	if (device_names) {
-	//		set_gui_property (X_("midnam-custom-device-mode"), *device_names->custom_device_mode_names().begin());
-	//	}
-	//}
-
 	ArdourWidgets::set_tooltip (_midnam_model_selector, _("External MIDI Device"));
 	ArdourWidgets::set_tooltip (_midnam_custom_device_mode_selector, _("External Device Mode"));
 
@@ -279,7 +265,6 @@ MidiTimeAxisView::set_route (boost::shared_ptr<Route> rt)
 	MIDI::Name::MidiPatchManager::instance().maybe_use (*this, invalidator (*this), boost::bind (&MidiTimeAxisView::use_midnam_info, this), gui_context());
 
 	trigger_model_change ();
-	custom_device_mode_changed (gui_property(X_("midnam-custom-device-mode")));
 
 	controls_vbox.pack_start(_midi_controls_box, false, false);
 
@@ -420,13 +405,15 @@ MidiTimeAxisView::setup_midnam_patches ()
 void
 MidiTimeAxisView::trigger_model_change ()
 {
+	const std::string saved_model_name = gui_property (X_("midnam-model-name"));
+	const std::string saved_mode = gui_property (X_("midnam-custom-device-mode"));
+
 	boost::shared_ptr<PluginInsert> pi = boost::dynamic_pointer_cast<PluginInsert> (_route->the_instrument ());
 
 	if (pi && pi->plugin ()->has_midnam ()) {
 		cout << "we have plugin midnam" << endl;
 
 		const std::string model_name = pi->plugin ()->midnam_model ();
-		const std::string saved_model_name = gui_property (X_("midnam-model-name"));
 
 		if (!saved_model_name.empty()) {
 			assert (saved_model_name != model_name);
@@ -438,9 +425,16 @@ MidiTimeAxisView::trigger_model_change ()
 			model_changed (saved_model_name);
 
 		} else {
-			/* ensure that "Plugin Provided" is prefixed at the top of the list */
 			cout << "changing to: " << model_name << endl;
 			model_changed (model_name);
+		}
+	} else {
+		if (!saved_model_name.empty() && !saved_mode.empty() ){
+			model_changed (saved_model_name);
+			custom_device_mode_changed(saved_mode);
+		} else {
+			model_changed ("Generic");
+			custom_device_mode_changed("MIDI");
 		}
 	}
 }
@@ -511,10 +505,14 @@ MidiTimeAxisView::model_changed(const std::string& model)
 	if (device_modes.size() > 0) {
 		cout << "1-really setting instrument to: " << model << " mode: " << device_modes.front() << endl;
 		_route->instrument_info().set_external_instrument (model, device_modes.front());
+		_current_mode = device_modes.front();
 	} else {
 		cout << "2-really setting instrument to: " << model << " no-mode" << endl;
 		_route->instrument_info().set_external_instrument (model, "");
+		_current_mode = "";
 	}
+
+	_current_model = model;
 
 	// Rebuild controller menu
 	_controller_menu_map.clear ();
@@ -536,6 +534,8 @@ MidiTimeAxisView::custom_device_mode_changed(const std::string& mode)
 	_midnam_custom_device_mode_selector.set_text(mode);
 	cout << "3-really setting instrument to: " << model << " mode: " << mode << endl;
 	_route->instrument_info().set_external_instrument (model, mode);
+	_current_model = model;
+	_current_mode = mode;
 }
 
 MidiStreamView*
@@ -931,7 +931,7 @@ MidiTimeAxisView::get_device_mode()
 		return boost::shared_ptr<MIDI::Name::CustomDeviceMode>();
 	}
 
-	return device_names->custom_device_mode_by_name(gui_property (X_("midnam-custom-device-mode")));
+	return device_names->custom_device_mode_by_name(_current_mode);
 }
 
 boost::shared_ptr<MIDI::Name::MasterDeviceNames>
@@ -939,14 +939,7 @@ MidiTimeAxisView::get_device_names()
 {
 	using namespace MIDI::Name;
 
-	std::string model = gui_property (X_("midnam-model-name"));
-
-	if (model.empty()) {
-		boost::shared_ptr<PluginInsert> pi = boost::dynamic_pointer_cast<PluginInsert> (_route->the_instrument ());
-		if (pi && pi->plugin ()->has_midnam ()) {
-			model = pi->plugin ()->midnam_model ();
-		}
-	}
+	const std::string model = _current_model;
 
 	boost::shared_ptr<MIDINameDocument> midnam = MidiPatchManager::instance() .document_by_model(model);
 	if (midnam) {
