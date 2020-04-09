@@ -256,7 +256,6 @@ LocationEditRow::set_location (Location *loc)
 		string date = gdt.format ("%F %H:%M");
 		date_label.set_text(date);
 		item_table.attach (date_label, 9, 10, 0, 1, FILL, Gtk::FILL, 4, 0);
-		
 	}
 	hide_check_button.set_active (location->is_hidden());
 	lock_check_button.set_active (location->locked());
@@ -944,6 +943,9 @@ LocationUI::location_added (Location* location)
 		punch_edit_row.set_location(location);
 	} else if (location->is_auto_loop()) {
 		loop_edit_row.set_location(location);
+	} else if (location->is_xrun()) {
+		/* we don't show xrun markers here */
+		return;
 	} else if (location->is_range_marker() || location->is_mark()) {
 		Locations::LocationList loc = _session->locations()->list ();
 		loc.sort (LocationSortByStart ());

@@ -7,7 +7,7 @@
  * Copyright (C) 2007-2012 Carl Hetherington <carl@carlh.net>
  * Copyright (C) 2007-2015 Tim Mayberry <mojofunk@gmail.com>
  * Copyright (C) 2007 Doug McLain <doug@nostar.net>
- * Copyright (C) 2013-2019 Robin Gareus <robin@gareus.org>
+ * Copyright (C) 2013-2020 Robin Gareus <robin@gareus.org>
  * Copyright (C) 2014-2018 Ben Loftis <ben@harrisonconsoles.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -121,6 +121,8 @@ ARDOUR_UI::set_session (Session *s)
 		virtual_keyboard_window->set_session (s);
 	}
 
+	update_path_label ();
+
 	if (!_session) {
 		WM::Manager::instance().set_session (s);
 		/* Session option editor cannot exist across change-of-session */
@@ -192,6 +194,9 @@ ARDOUR_UI::set_session (Session *s)
 	_session->TransportStateChange.connect (_session_connections, MISSING_INVALIDATOR, boost::bind (&ARDOUR_UI::map_transport_state, this), gui_context());
 	_session->DirtyChanged.connect (_session_connections, MISSING_INVALIDATOR, boost::bind (&ARDOUR_UI::session_dirty_changed, this), gui_context());
 
+	_session->PunchLoopConstraintChange.connect (_session_connections, MISSING_INVALIDATOR, boost::bind (&ARDOUR_UI::set_punch_sensitivity, this), gui_context());
+	_session->auto_punch_location_changed.connect (_session_connections, MISSING_INVALIDATOR, boost::bind (&ARDOUR_UI::set_punch_sensitivity, this), gui_context ());
+
 	_session->Xrun.connect (_session_connections, MISSING_INVALIDATOR, boost::bind (&ARDOUR_UI::xrun_handler, this, _1), gui_context());
 	_session->SoloActive.connect (_session_connections, MISSING_INVALIDATOR, boost::bind (&ARDOUR_UI::soloing_changed, this, _1), gui_context());
 	_session->AuditionActive.connect (_session_connections, MISSING_INVALIDATOR, boost::bind (&ARDOUR_UI::auditioning_changed, this, _1), gui_context());
@@ -199,8 +204,8 @@ ARDOUR_UI::set_session (Session *s)
 	_session->locations()->removed.connect (_session_connections, MISSING_INVALIDATOR, boost::bind (&ARDOUR_UI::handle_locations_change, this, _1), gui_context());
 	_session->config.ParameterChanged.connect (_session_connections, MISSING_INVALIDATOR, boost::bind (&ARDOUR_UI::session_parameter_changed, this, _1), gui_context ());
 
-	_session->LatencyUpdated.connect (_session_connections, MISSING_INVALIDATOR, boost::bind (&ARDOUR_UI::session_latency_updated, this), gui_context());
-	session_latency_updated ();
+	_session->LatencyUpdated.connect (_session_connections, MISSING_INVALIDATOR, boost::bind (&ARDOUR_UI::session_latency_updated, this, _1), gui_context());
+	session_latency_updated (true);
 
 	/* Clocks are on by default after we are connected to a session, so show that here.
 	*/
@@ -305,12 +310,15 @@ ARDOUR_UI::unload_session (bool hide_stuff)
 		case -1:
 			// cancel
 			return 1;
-
 		case 1:
+			if (_session->unnamed()) {
+				rename_session (true);
+			}
 			_session->save_state ("");
 			break;
 		}
 	}
+
 
 	{
 		// tear down session specific CPI (owned by rc_config_editor which can remain)
@@ -983,4 +991,30 @@ ARDOUR_UI::toggle_mixer_space()
 	} else {
 		mixer->restore_mixer_space ();
 	}
+}
+
+bool
+ARDOUR_UI::timecode_button_press (GdkEventButton* ev)
+{
+	if (ev->button != 1 || ev->type != GDK_2BUTTON_PRESS) {
+		return false;
+	}
+	if (_session) {
+		session_option_editor->show ();
+		session_option_editor->set_current_page (_("Timecode"));
+	}
+	return true;
+}
+
+bool
+ARDOUR_UI::format_button_press (GdkEventButton* ev)
+{
+	if (ev->button != 1 || ev->type != GDK_2BUTTON_PRESS) {
+		return false;
+	}
+	if (_session) {
+		session_option_editor->show ();
+		session_option_editor->set_current_page (_("Media"));
+	}
+	return true;
 }

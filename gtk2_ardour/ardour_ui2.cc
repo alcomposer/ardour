@@ -49,6 +49,7 @@
 #include "gtkmm2ext/utils.h"
 #include "gtkmm2ext/window_title.h"
 
+#include "ardour/audioengine.h"
 #include "ardour/profile.h"
 #include "ardour/session.h"
 #include "ardour/types.h"
@@ -603,7 +604,7 @@ ARDOUR_UI::setup_transport ()
 
 	/* initialize */
 	latency_switch_changed ();
-	session_latency_updated ();
+	session_latency_updated (true);
 
 	repack_transport_hbox ();
 	update_clock_visibility ();
@@ -630,8 +631,16 @@ ARDOUR_UI::latency_switch_changed ()
 }
 
 void
-ARDOUR_UI::session_latency_updated ()
+ARDOUR_UI::session_latency_updated (bool for_playback)
 {
+	if (!for_playback) {
+		/* latency updates happen in pairs, in the following order:
+		 *  - for capture
+		 *  - for playback
+		 */
+		return;
+	}
+
 	if (!_session) {
 		route_latency_value.set_text ("--");
 		io_latency_value.set_text ("--");
@@ -641,7 +650,12 @@ ARDOUR_UI::session_latency_updated ()
 		float rate      = _session->nominal_sample_rate ();
 
 		route_latency_value.set_text (samples_as_time_string (wrl, rate));
-		io_latency_value.set_text (samples_as_time_string (wpl, rate));
+
+		if (_session->engine().check_for_ambiguous_latency (true)) {
+			io_latency_value.set_markup ("<span background=\"red\" foreground=\"white\">ambiguous</span>");
+		} else {
+			io_latency_value.set_text (samples_as_time_string (wpl, rate));
+		}
 	}
 }
 
@@ -808,6 +822,14 @@ ARDOUR_UI::set_transport_sensitivity (bool yn)
 {
 	ActionManager::set_sensitive (ActionManager::transport_sensitive_actions, yn);
 	shuttle_box.set_sensitive (yn);
+}
+
+void
+ARDOUR_UI::set_punch_sensitivity ()
+{
+	bool can_punch = _session && _session->punch_is_possible() && _session->locations()->auto_punch_location ();
+	ActionManager::get_action ("Transport", "TogglePunchIn")->set_sensitive (can_punch);
+	ActionManager::get_action ("Transport", "TogglePunchOut")->set_sensitive (can_punch);
 }
 
 void

@@ -83,6 +83,7 @@ _query_registry (const char *regkey, const char *regval, std::string &rv) {
 static void*
 _pingback (void *arg)
 {
+	pthread_set_name ("Pingback");
 	ArdourCurl::HttpGet h;
 
 	ping_call* cm = static_cast<ping_call*> (arg);
@@ -178,7 +179,7 @@ _pingback (void *arg)
 		if ( return_str.length() > 140 ) { // like a tweet :)
 			std::cerr << "Announcement string is too long (probably behind a proxy)." << std::endl;
 		} else {
-			std::cerr << "Announcement is: " << return_str << std::endl;
+			std::cout << "Announcement is: " << return_str << std::endl;
 
 			//write announcements to local file, even if the
 			//announcement is empty

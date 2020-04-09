@@ -102,7 +102,8 @@ public:
 	void set_selected_regionviews (RegionSelection&);
 	void get_selectables (ARDOUR::samplepos_t start, ARDOUR::samplepos_t end, double top, double bot, std::list<Selectable *>&, bool within = false);
 	void get_inverted_selectables (Selection&, std::list<Selectable*>&);
-	void set_layer_display (LayerDisplay d, bool apply_to_selection = false);
+	void set_layer_display (LayerDisplay d);
+	void toggle_layer_display ();
 	LayerDisplay layer_display () const;
 
 	boost::shared_ptr<ARDOUR::Region> find_next_region (samplepos_t pos, ARDOUR::RegionPoint, int32_t dir);
@@ -148,6 +149,10 @@ public:
 	void effective_gain_display () { gm.effective_gain_display(); }
 
 	std::string state_id() const;
+
+	void show_all_automation (bool apply_to_selection = false);
+	void show_existing_automation (bool apply_to_selection = false);
+	void hide_all_automation (bool apply_to_selection = false);
 
 protected:
 	friend class StreamView;
@@ -230,10 +235,6 @@ protected:
 
 	bool         automation_click (GdkEventButton *);
 
-	virtual void show_all_automation (bool apply_to_selection = false);
-	virtual void show_existing_automation (bool apply_to_selection = false);
-	virtual void hide_all_automation (bool apply_to_selection = false);
-
 	void timestretch (samplepos_t start, samplepos_t end);
 	void speed_changed ();
 	void map_frozen ();
@@ -260,7 +261,8 @@ protected:
 	Gtk::MenuItem*      plugins_submenu_item;
 	RouteGroupMenu*     route_group_menu;
 	Gtk::Menu*          playlist_action_menu;
-	Gtk::MenuItem*      playlist_item;
+	Gtk::MenuItem*      overlaid_menu_item;
+	Gtk::MenuItem*      stacked_menu_item;
 
 	void use_playlist (Gtk::RadioMenuItem *item, boost::weak_ptr<ARDOUR::Playlist> wpl);
 
@@ -289,6 +291,7 @@ protected:
 	UnderlayMirrorList _underlay_mirrors;
 
 	bool _ignore_set_layer_display;
+	void layer_display_menu_change (Gtk::MenuItem* item);
 
 protected:
 	void update_pan_track_visibility ();

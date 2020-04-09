@@ -23,6 +23,7 @@
 
 #include "pbd/error.h"
 #include <glibmm/threads.h>
+#include <glibmm/timer.h>
 
 #include <midi++/mmc.h>
 
@@ -111,9 +112,10 @@ Session::start_audio_export (samplepos_t position, bool realtime, bool region_ex
 {
 	if (!_exporting) {
 		pre_export ();
+	} else {
+		realtime_stop (true, true);
 	}
 
-	_realtime_export = realtime;
 	_region_export = region_export;
 
 	if (region_export) {
@@ -135,6 +137,8 @@ Session::start_audio_export (samplepos_t position, bool realtime, bool region_ex
 	   it here.
 	*/
 
+	Glib::usleep (engine().usecs_per_cycle ());
+	_butler->schedule_transport_work ();
 	_butler->wait_until_finished ();
 
 	/* get everyone to the right position */
@@ -165,7 +169,6 @@ Session::start_audio_export (samplepos_t position, bool realtime, bool region_ex
 	} else {
 		_remaining_latency_preroll = 0;
 	}
-	export_status->stop = false;
 
 	/* get transport ready. note how this is calling butler functions
 	   from a non-butler thread. we waited for the butler to stop
@@ -179,15 +182,27 @@ Session::start_audio_export (samplepos_t position, bool realtime, bool region_ex
 		return -1;
 	}
 
-	_engine.Freewheel.connect_same_thread (export_freewheel_connection, boost::bind (&Session::process_export_fw, this, _1));
+	assert (!_engine.freewheeling ());
+	assert (!_engine.in_process_thread ());
 
-	if (_realtime_export) {
+	if (realtime) {
 		Glib::Threads::Mutex::Lock lm (AudioEngine::instance()->process_lock ());
 		_export_rolling = true;
+		_realtime_export = true;
+		export_status->stop = false;
 		process_function = &Session::process_export_fw;
+		/* this is required for ExportGraphBuilder::Intermediate::start_post_processing */
+		_engine.Freewheel.connect_same_thread (export_freewheel_connection, boost::bind (&Session::process_export_fw, this, _1));
 		return 0;
 	} else {
+		if (_realtime_export) {
+			Glib::Threads::Mutex::Lock lm (AudioEngine::instance()->process_lock ());
+			process_function = &Session::process_with_events;
+		}
+		_realtime_export = false;
 		_export_rolling = true;
+		export_status->stop = false;
+		_engine.Freewheel.connect_same_thread (export_freewheel_connection, boost::bind (&Session::process_export_fw, this, _1));
 		return _engine.freewheel (true);
 	}
 }
@@ -224,7 +239,10 @@ Session::process_export (pframes_t nframes)
 	try {
 		/* handle export - XXX what about error handling? */
 
-		ProcessExport (nframes);
+		if (ProcessExport (nframes).value_or (0) > 0) {
+			/* last cycle completed */
+			flush_all_inserts ();
+		}
 
 	} catch (std::exception & e) {
 		error << string_compose (_("Export ended unexpectedly: %1"), e.what()) << endmsg;
@@ -235,6 +253,17 @@ Session::process_export (pframes_t nframes)
 void
 Session::process_export_fw (pframes_t nframes)
 {
+	if (!_export_rolling) {
+		try {
+			ProcessExport (0);
+		} catch (std::exception & e) {
+			/* pre-roll export must not throw */
+			assert (0);
+			export_status->abort (true);
+		}
+		return;
+	}
+
 	const bool need_buffers = _engine.freewheeling ();
 	if (_export_preroll > 0) {
 
@@ -253,10 +282,19 @@ Session::process_export_fw (pframes_t nframes)
 			return;
 		}
 
-		set_transport_speed (1.0, 0, false);
+		set_transport_speed (1.0, false, false, false);
 		butler_transport_work ();
 		g_atomic_int_set (&_butler->should_do_transport_work, 0);
 		butler_completed_transport_work ();
+		/* Session::process_with_events () sets _remaining_latency_preroll = 0
+		 * when being called with _transport_speed == 0.0.
+		 *
+		 * This can happen wit JACK, there is a process-callback before
+		 * freewheeling becomes active, after Session::start_audio_export().
+		 */
+		if (!_region_export) {
+			_remaining_latency_preroll = worst_latency_preroll_buffer_size_ceil ();
+		}
 
 		return;
 	}
@@ -268,20 +306,39 @@ Session::process_export_fw (pframes_t nframes)
 			_engine.main_thread()->get_buffers ();
 		}
 
-		process_without_events (remain);
+		assert (_count_in_samples == 0);
+		while (remain > 0) {
+			samplecnt_t ns = calc_preroll_subcycle (remain);
+
+			bool session_needs_butler = false;
+			if (process_routes (ns, session_needs_butler)) {
+				fail_roll (ns);
+			}
+
+			try {
+				ProcessExport (ns);
+			} catch (std::exception & e) {
+				/* pre-roll export must not throw */
+				assert (0);
+				export_status->abort (true);
+			}
+
+			_remaining_latency_preroll -= ns;
+			remain -= ns;
+			nframes -= ns;
+
+			if (remain != 0) {
+				_engine.split_cycle (ns);
+			}
+		}
 
 		if (need_buffers) {
 			_engine.main_thread()->drop_buffers ();
 		}
 
-		_remaining_latency_preroll -= remain;
-		_transport_sample -= remain;
-		nframes -= remain;
-
 		if (nframes == 0) {
 			return;
 		}
-		_engine.split_cycle (remain);
 	}
 
 	if (need_buffers) {

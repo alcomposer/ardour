@@ -51,7 +51,7 @@ VirtualKeyboardWindow::VirtualKeyboardWindow ()
 
 	_piano.set_flags (Gtk::CAN_FOCUS);
 
-	_piano.set_keyboard_layout (APianoKeyboard::S_QWERTY);
+	select_keyboard_layout (UIConfiguration::instance().get_vkeybd_layout ());
 	_piano.set_annotate_octave (true);
 	_piano.set_grand_piano_highlight (false);
 	_piano.set_annotate_layout (true);
@@ -249,6 +249,7 @@ VirtualKeyboardWindow::set_session (ARDOUR::Session* s)
 		set_state (*node);
 	}
 }
+
 void
 VirtualKeyboardWindow::parameter_changed (std::string const& p)
 {
@@ -364,19 +365,7 @@ VirtualKeyboardWindow::on_key_release_event (GdkEventKey* ev)
 void
 VirtualKeyboardWindow::select_keyboard_layout (std::string const& l)
 {
-	if (l == "QWERTY") {
-		_piano.set_keyboard_layout (APianoKeyboard::QWERTY);
-	} else if (l == "QWERTZ") {
-		_piano.set_keyboard_layout (APianoKeyboard::QWERTZ);
-	} else if (l == "AZERTY") {
-		_piano.set_keyboard_layout (APianoKeyboard::AZERTY);
-	} else if (l == "DVORAK") {
-		_piano.set_keyboard_layout (APianoKeyboard::DVORAK);
-	} else if (l == "QWERTY Single") {
-		_piano.set_keyboard_layout (APianoKeyboard::S_QWERTY);
-	} else if (l == "QWERTZ Single") {
-		_piano.set_keyboard_layout (APianoKeyboard::S_QWERTZ);
-	}
+	_piano.set_keyboard_layout (PianoKeyBindings::layout (l));
 	_piano.grab_focus ();
 }
 

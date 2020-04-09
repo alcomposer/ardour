@@ -32,6 +32,7 @@
 
 #include "pbd/error.h"
 #include "pbd/strsplit.h"
+#include "pbd/unwind.h"
 
 #include "ardour/async_midi_port.h"
 #include "ardour/audio_backend.h"
@@ -81,7 +82,7 @@ PortManager::remove_all_ports ()
 	 * ports know that they have nothing to do.
 	 */
 
-	_port_remove_in_progress = true;
+	PBD::Unwinder<bool> uw (_port_remove_in_progress, true);
 
 	/* process lock MUST be held by caller
 	*/
@@ -102,8 +103,6 @@ PortManager::remove_all_ports ()
 	 */
 
 	_port_deletions_pending.reset ();
-
-	_port_remove_in_progress = false;
 }
 
 
@@ -1373,4 +1372,33 @@ PortManager::set_port_buffer_sizes (pframes_t n)
 	for (Ports::iterator p = all->begin(); p != all->end(); ++p) {
 		p->second->set_buffer_size (n);
 	}
+}
+
+bool
+PortManager::check_for_ambiguous_latency (bool log) const
+{
+	bool rv = false;
+	boost::shared_ptr<Ports> plist = ports.reader();
+	for (Ports::iterator pi = plist->begin(); pi != plist->end(); ++pi) {
+		boost::shared_ptr<Port> const& p (pi->second);
+		if (! p->sends_output () || (p->flags () & IsTerminal)) {
+			continue;
+		}
+		if (boost::dynamic_pointer_cast<AsyncMIDIPort>(p)) {
+			continue;
+		}
+		assert (port_is_mine (p->name ()));
+
+		LatencyRange range;
+		p->get_connected_latency_range (range, true);
+		if (range.min != range.max) {
+			if (log) {
+				warning << string_compose(_("Ambiguous latency for port '%1' (%2, %3)"), p->name(), range.min, range.max) << endmsg;
+				rv = true;
+			} else {
+				return true;
+			}
+		}
+	}
+	return rv;
 }

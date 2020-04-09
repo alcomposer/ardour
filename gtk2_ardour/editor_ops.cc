@@ -55,6 +55,7 @@
 #include "widgets/popup.h"
 #include "widgets/prompter.h"
 
+#include "ardour/audioengine.h"
 #include "ardour/audio_track.h"
 #include "ardour/audioregion.h"
 #include "ardour/boost_debug.h"
@@ -292,13 +293,13 @@ Editor::split_regions_at (MusicSample where, RegionSelection& regions)
 		selection->clear_time();
 		//but leave track selection intact
 	}
-	
+
 	//if the user doesn't want to preserve the "Existing" selection, then clear the selection
 	if (!(rsas & Existing)) {
 		selection->clear_objects();
 		selection->clear_time();
 	}
-	
+
 	//if the user wants newly-created regions to be selected, then select them:
 	if (mouse_mode == MouseObject) {
 		for (RegionSelection::iterator ri = latest_regionviews.begin(); ri != latest_regionviews.end(); ri++) {
@@ -796,7 +797,7 @@ Editor::build_region_boundary_cache ()
 				break;
 
 			case End:
-				rpos = r->last_sample();
+				rpos = r->last_sample() + 1;
 				break;
 
 			case SyncPoint:
@@ -1766,7 +1767,7 @@ Editor::temporal_zoom_step_scale (bool zoom_out, double scale)
 }
 
 void
-Editor::temporal_zoom (samplecnt_t fpp)
+Editor::temporal_zoom (samplecnt_t spp)
 {
 	if (!_session) {
 		return;
@@ -1782,10 +1783,10 @@ Editor::temporal_zoom (samplecnt_t fpp)
 	samplepos_t where;
 	bool in_track_canvas;
 	bool use_mouse_sample = true;
-	samplecnt_t nfpp;
+	samplecnt_t nspp;
 	double l;
 
-	if (fpp == samples_per_pixel) {
+	if (spp == samples_per_pixel) {
 		return;
 	}
 
@@ -1797,10 +1798,10 @@ Editor::temporal_zoom (samplecnt_t fpp)
 	// all of which is used for the editor track displays. The whole day
 	// would be 4147200000 samples, so 2592000 samples per pixel.
 
-	nfpp = min (fpp, (samplecnt_t) 2592000);
-	nfpp = max ((samplecnt_t) 1, nfpp);
+	nspp = min (spp, (samplecnt_t) 2592000);
+	nspp = max ((samplecnt_t) 1, nspp);
 
-	new_page_size = (samplepos_t) floor (_visible_canvas_width * nfpp);
+	new_page_size = (samplepos_t) floor (_visible_canvas_width * nspp);
 	half_page_size = new_page_size / 2;
 
 	Editing::ZoomFocus zf = zoom_focus;
@@ -1896,7 +1897,7 @@ Editor::temporal_zoom (samplecnt_t fpp)
 
 	// leftmost_after_zoom = min (leftmost_after_zoom, _session->current_end_sample());
 
-	reposition_and_zoom (leftmost_after_zoom, nfpp);
+	reposition_and_zoom (leftmost_after_zoom, nspp);
 }
 
 void
@@ -3180,12 +3181,6 @@ Editor::separate_regions_between (const TimeSelection& ts)
 			continue;
 		}
 
-		/* no edits to destructive tracks */
-
-		if (rtv->track()->destructive()) {
-			continue;
-		}
-
 		if ((playlist = rtv->playlist()) != 0) {
 
 			playlist->clear_changes ();
@@ -3239,7 +3234,7 @@ Editor::separate_regions_between (const TimeSelection& ts)
 			//but leave track selection intact
 		} else if (rsas == ForceSel) {
 			//note: forcing the regions to be selected *might* force a tool-change to Object here
-			selection->set(new_selection);	
+			selection->set(new_selection);
 		}
 
 		commit_reversible_command ();
@@ -3443,8 +3438,7 @@ Editor::crop_region_to (samplepos_t start, samplepos_t end)
 
 		boost::shared_ptr<Track> t = rtv->track();
 
-		if (t != 0 && ! t->destructive()) {
-
+		if (t) {
 			if ((playlist = rtv->playlist()) != 0) {
 				playlists.push_back (playlist);
 			}
@@ -3984,12 +3978,24 @@ Editor::freeze_route ()
 	}
 
 	/* stop transport before we start. this is important */
-
 	_session->request_transport_speed (0.0);
 
 	/* wait for just a little while, because the above call is asynchronous */
+	int timeout = 10;
+	do {
+		Glib::usleep (_session->engine().usecs_per_cycle ());
+	} while (!_session->transport_stopped() && --timeout > 0);
 
-	Glib::usleep (250000);
+	if (timeout == 0) {
+		ArdourMessageDialog d (
+			_("Transport cannot be stopped, likely due to external timecode sync.\n"
+			  "Freezing a track requires the transport to be stopped.")
+			);
+		d.set_title (_("Cannot freeze"));
+		d.run ();
+		return;
+		return;
+	}
 
 	if (clicked_routeview == 0 || !clicked_routeview->is_audio_track()) {
 		return;
@@ -4006,8 +4012,8 @@ Editor::freeze_route ()
 	}
 
 	if (clicked_routeview->track()->has_external_redirects()) {
-		ArdourMessageDialog d (string_compose (_("<b>%1</b>\n\nThis track has at least one send/insert/return as part of its signal flow.\n\n"
-		                                         "Freezing will only process the signal as far as the first send/insert/return."),
+		ArdourMessageDialog d (string_compose (_("<b>%1</b>\n\nThis track has at least one send/insert/return/sidechain as part of its signal flow.\n\n"
+		                                         "Freezing will only process the signal as far as the first send/insert/return/sidechain."),
 		                                       clicked_routeview->track()->name()), true, MESSAGE_INFO, BUTTONS_NONE, true);
 
 		d.add_button (_("Freeze anyway"), Gtk::RESPONSE_OK);
@@ -4017,10 +4023,10 @@ Editor::freeze_route ()
 		int response = d.run ();
 
 		switch (response) {
-		case Gtk::RESPONSE_CANCEL:
-			return;
-		default:
-			break;
+			case Gtk::RESPONSE_OK:
+				break;
+			default:
+				return;
 		}
 	}
 
@@ -4513,7 +4519,7 @@ Editor::recover_regions (ARDOUR::RegionList regions)
 			if (track) {
 				//ToDo
 				if (source->captured_for() == track->) {
-					//_session->add_command(new StatefulDiffCommand (playlist));	
+					//_session->add_command(new StatefulDiffCommand (playlist));
 				}
 			}
 		}
@@ -5224,12 +5230,12 @@ Editor::tag_regions (RegionList regions)
 
 	std::string tagstr = entry.get_text();
 	strip_whitespace_edges (tagstr);
-	
+
 	if (!tagstr.empty()) {
 		for (RegionList::iterator r = regions.begin(); r != regions.end(); r++) {
 			(*r)->set_tags(tagstr);
 		}
-			
+
 		_regions->redisplay ();
 	}
 }
@@ -5270,7 +5276,7 @@ Editor::tag_last_capture ()
 
 		}
 	}
-	
+
 	tag_regions(rlist);
 }
 
@@ -5759,8 +5765,11 @@ Editor::insert_patch_change (bool from_context)
 	Evoral::PatchChange<Temporal::Beats> empty (Temporal::Beats(), 0, 0, 0);
 	PatchChangeDialog d (0, _session, empty, first->instrument_info(), Gtk::Stock::ADD);
 
-	if (d.run() == RESPONSE_CANCEL) {
-		return;
+	switch (d.run()) {
+		case Gtk::RESPONSE_ACCEPT:
+			break;
+		default:
+			return;
 	}
 
 	for (RegionSelection::iterator i = rs.begin (); i != rs.end(); ++i) {
@@ -7324,8 +7333,12 @@ Editor::close_region_gaps ()
 	dialog.add_button (_("Ok"), RESPONSE_ACCEPT);
 	dialog.show_all ();
 
-	if (dialog.run () == RESPONSE_CANCEL) {
-		return;
+	switch (dialog.run ()) {
+		case Gtk::RESPONSE_ACCEPT:
+		case Gtk::RESPONSE_OK:
+			break;
+		default:
+			return;
 	}
 
 	samplepos_t crossfade_len = spin_crossfade.get_value();
@@ -8490,4 +8503,62 @@ Editor::bring_all_sources_into_session ()
 	cerr << " Do it\n";
 
 	_session->bring_all_sources_into_session (boost::bind (&Editor::bring_in_callback, this, &msg, _1, _2, _3));
+}
+
+void
+Editor::toggle_all_existing_automation ()
+{
+	TrackViewList & tvl (selection->tracks.empty() ? track_views : selection->tracks);
+	bool some_automation_shown = false;
+
+	for (TrackViewList::const_iterator t = tvl.begin(); t != tvl.end(); ++t) {
+		TimeAxisView::Children children = (*t)->get_child_list ();
+		for (TimeAxisView::Children::const_iterator c = children.begin(); c != children.end(); ++c) {
+			if (boost::dynamic_pointer_cast<AutomationTimeAxisView> (*c)) {
+				some_automation_shown = true;
+				break;
+			}
+		}
+
+		if (some_automation_shown) {
+			break;
+		}
+	}
+
+	if (!some_automation_shown) {
+		tvl.foreach_stripable_time_axis (boost::bind (&StripableTimeAxisView::show_existing_automation, _1, false));
+	} else {
+		tvl.foreach_stripable_time_axis (boost::bind (&StripableTimeAxisView::hide_all_automation, _1, false));
+	}
+}
+
+void
+Editor::toggle_layer_display ()
+{
+	TrackViewList & tvl (selection->tracks.empty() ? track_views : selection->tracks);
+	bool seen_stacked = false;
+	bool seen_overlaid = false;
+
+	for (TrackViewList::const_iterator t = tvl.begin(); t != tvl.end(); ++t) {
+		RouteTimeAxisView* rtav = dynamic_cast<RouteTimeAxisView*> (*t);
+
+		if (!rtav || !rtav->is_track()) {
+			continue;
+		}
+
+		if (rtav->layer_display () == Stacked) {
+			seen_stacked = true;
+		} else if (rtav->layer_display() == Overlaid) {
+			seen_overlaid = true;
+		}
+	}
+
+	if (seen_stacked && seen_overlaid) {
+		/* inconsistent current display - go to overlaid */
+		tvl.foreach_route_time_axis (boost::bind (&RouteTimeAxisView::set_layer_display, _1, Overlaid));
+
+	} else {
+		tvl.foreach_route_time_axis (boost::bind (&RouteTimeAxisView::toggle_layer_display, _1));
+	}
+
 }

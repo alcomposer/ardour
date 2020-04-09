@@ -64,6 +64,7 @@ JACKAudioBackend::JACKAudioBackend (AudioEngine& e, AudioBackendInfo& info, boos
 	, _target_systemic_output_latency (0)
 	, _current_sample_rate (0)
 	, _current_buffer_size (0)
+	, _jack_ports (new JackPorts)
 	, _session (0)
 {
 	_jack_connection->Connected.connect_same_thread (jack_connection_connection, boost::bind (&JACKAudioBackend::when_connected_to_jack, this));
@@ -72,6 +73,13 @@ JACKAudioBackend::JACKAudioBackend (AudioEngine& e, AudioBackendInfo& info, boos
 
 JACKAudioBackend::~JACKAudioBackend()
 {
+	{
+		RCUWriter<JackPorts> writer (_jack_ports);
+		boost::shared_ptr<JackPorts> jp = writer.get_copy ();
+		jp->clear ();
+	}
+
+	_jack_ports.flush ();
 }
 
 string
@@ -1086,7 +1094,8 @@ JACKAudioBackend::n_physical (unsigned long flags) const
 	if (ports) {
 		for (uint32_t i = 0; ports[i]; ++i) {
 			if (!strstr (ports[i], "Midi-Through")) {
-				DataType t = port_data_type (jack_port_by_name (_priv_jack, ports[i]));
+				boost::shared_ptr<JackPort> jp (new JackPort (jack_port_by_name (_priv_jack, ports[i])));
+				DataType t = port_data_type (jp);
 				if (t != DataType::NIL) {
 					c.set (t, c.get (t) + 1);
 				}

@@ -852,6 +852,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\gtk2_ardour\missing_filesource_dialog.cc"
+				>
+			</File>
+			<File
 				RelativePath="..\gtk2_ardour\missing_plugin_dialog.cc"
 				>
 			</File>
@@ -961,6 +965,10 @@
 			</File>
 			<File
 				RelativePath="..\gtk2_ardour\patch_change_widget.cc"
+				>
+			</File>
+			<File
+				RelativePath="..\gtk2_ardour\piano_key_bindings.cc"
 				>
 			</File>
 			<File
@@ -1253,10 +1261,6 @@
 			</File>
 			<File
 				RelativePath="..\gtk2_ardour\sys_ex.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\gtk2_ardour\tape_region_view.cc"
 				>
 			</File>
 			<File
@@ -1950,6 +1954,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\gtk2_ardour\missing_filesource_dialog.h"
+				>
+			</File>
+			<File
 				RelativePath="..\gtk2_ardour\missing_plugin_dialog.h"
 				>
 			</File>
@@ -2063,6 +2071,10 @@
 			</File>
 			<File
 				RelativePath="..\gtk2_ardour\patch_change_widget.h"
+				>
+			</File>
+			<File
+				RelativePath="..\gtk2_ardour\piano_key_bindings.h"
 				>
 			</File>
 			<File
@@ -2399,10 +2411,6 @@
 			</File>
 			<File
 				RelativePath="..\gtk2_ardour\sys_ex.h"
-				>
-			</File>
-			<File
-				RelativePath="..\gtk2_ardour\tape_region_view.h"
 				>
 			</File>
 			<File

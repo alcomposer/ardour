@@ -29,9 +29,11 @@
 #include "piano_roll_header.h"
 #include "midi_time_axis.h"
 #include "midi_streamview.h"
+#include "midi_region_view.h"
 #include "public_editor.h"
 #include "ui_config.h"
 #include "midi++/midnam_patch.h"
+#include "note_base.h"
 
 #include "pbd/i18n.h"
 
@@ -408,8 +410,9 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 PianoRollHeader::midnamName
 PianoRollHeader::get_note_name (int note)
 {
+/*
 	using namespace MIDI::Name;
-	std::string name;
+    std::string name;
 	std::string note_n;
 	midnamName rtn;
 
@@ -424,6 +427,14 @@ PianoRollHeader::get_note_name (int note)
 			                               note);
 		}
 	}
+*/
+	using namespace MIDI::Name;
+    std::string note_n;
+    midnamName rtn;
+    boost::shared_ptr<NoteType> dummy_note ( new NoteType);
+
+    std::string name = MidiRegionView::get_note_name(dummy_note, note);
+
 
 	int oct_rel = note % 12;
 	switch(oct_rel) {

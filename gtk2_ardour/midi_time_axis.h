@@ -98,9 +98,6 @@ public:
 	ARDOUR::NoteMode  note_mode() const { return _note_mode; }
 	ARDOUR::ColorMode color_mode() const { return _color_mode; }
 
-	boost::shared_ptr<MIDI::Name::MasterDeviceNames> get_device_names();
-	boost::shared_ptr<MIDI::Name::CustomDeviceMode> get_device_mode();
-
 	Gtk::CheckMenuItem* automation_child_menu_item (Evoral::Parameter);
 
 	StepEditor* step_editor() { return _step_editor; }
@@ -125,10 +122,10 @@ private:
 	sigc::signal<void, std::string, std::string>  _midi_patch_settings_changed;
 
 	void setup_midnam_patches ();
-	void update_patch_selector ();
 
 	sigc::connection _note_range_changed_connection;
 
+	void maybe_trigger_model_change ();
 	void model_changed(const std::string& model);
 	void custom_device_mode_changed(const std::string& mode);
 
@@ -147,6 +144,8 @@ private:
 	void update_control_names ();
 
 	bool                          _ignore_signals;
+	std::string                   _effective_model;
+	std::string                   _effective_mode;
 	MidiScroomer*                 _range_scroomer;
 	PianoRollHeader*              _piano_roll_header;
 	ARDOUR::NoteMode              _note_mode;

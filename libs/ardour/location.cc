@@ -213,6 +213,12 @@ Location::set_start (samplepos_t s, bool force, bool allow_beat_recompute, const
 		}
 	}
 
+	if (is_cd_marker()) {
+		if (s <= _session.current_start_sample()) {
+			return -1;
+		}
+	}
+
 	if (is_mark()) {
 		if (_start != s) {
 			_start = s;
@@ -1041,6 +1047,11 @@ Locations::remove (Location *loc)
 		for (i = locations.begin(); i != locations.end(); ++i) {
 			if ((*i) == loc) {
 				bool was_loop = (*i)->is_auto_loop();
+				if ((*i)->is_auto_punch()) {
+					/* needs to happen before deleting:
+					 * disconnect signals, clear events */
+					_session.set_auto_punch_location (0);
+				}
 				delete *i;
 				locations.erase (i);
 				was_removed = true;

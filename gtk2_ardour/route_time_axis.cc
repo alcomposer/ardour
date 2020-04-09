@@ -119,6 +119,8 @@ RouteTimeAxisView::RouteTimeAxisView (PublicEditor& ed, Session* sess, ArdourCan
 	, plugins_submenu_item (0)
 	, route_group_menu (0)
 	, playlist_action_menu (0)
+	, overlaid_menu_item (0)
+	, stacked_menu_item (0)
 	, gm (sess, true, 75, 14)
 	, _ignore_set_layer_display (false)
 	, pan_automation_item(NULL)
@@ -184,7 +186,7 @@ RouteTimeAxisView::set_route (boost::shared_ptr<Route> rt)
 	route_group_button.set_name ("route button");
 	playlist_button.set_name ("route button");
 	automation_button.set_name ("route button");
-	
+
 	route_group_button.signal_button_press_event().connect (sigc::mem_fun(*this, &RouteTimeAxisView::route_group_click), false);
 	playlist_button.signal_button_press_event().connect (sigc::mem_fun(*this, &RouteTimeAxisView::playlist_click), false);
 	automation_button.signal_button_press_event().connect (sigc::mem_fun(*this, &RouteTimeAxisView::automation_click), false);
@@ -650,34 +652,6 @@ RouteTimeAxisView::build_display_menu ()
 
 		RadioMenuItem::Group layers_group;
 
-		/* Find out how many overlaid/stacked tracks we have in the selection */
-
-		int overlaid = 0;
-		int stacked = 0;
-		int unchangeable = 0;
-		TrackSelection const & s = _editor.get_selection().tracks;
-
-		for (TrackSelection::const_iterator i = s.begin(); i != s.end(); ++i) {
-			StreamView* v = (*i)->view ();
-			if (!v) {
-				continue;
-			}
-
-			if (v->can_change_layer_display()) {
-				switch (v->layer_display ()) {
-				case Overlaid:
-					++overlaid;
-					break;
-				case Stacked:
-				case Expanded:
-					++stacked;
-					break;
-				}
-			} else {
-				unchangeable++;
-			}
-		}
-
 		/* We're not connecting to signal_toggled() here; in the case where these two items are
 		   set to be in the `inconsistent' state, it seems that one or other will end up active
 		   as well as inconsistent (presumably due to the RadioMenuItem::Group).  Then when you
@@ -688,23 +662,15 @@ RouteTimeAxisView::build_display_menu ()
 
 		layers_items.push_back (RadioMenuElem (layers_group, _("Overlaid")));
 		RadioMenuItem* i = dynamic_cast<RadioMenuItem*> (&layers_items.back ());
-		i->set_active (overlaid != 0 && stacked == 0);
-		i->set_inconsistent (overlaid != 0 && stacked != 0);
-		i->signal_activate().connect (sigc::bind (sigc::mem_fun (*this, &RouteTimeAxisView::set_layer_display), Overlaid, true));
-
-		if (unchangeable) {
-			i->set_sensitive (false);
-		}
+		i->set_active (layer_display() == Overlaid);
+		i->signal_toggled().connect (sigc::bind (sigc::mem_fun (*this, &RouteTimeAxisView::layer_display_menu_change), i));
+		overlaid_menu_item = i;
 
 		layers_items.push_back (RadioMenuElem (layers_group, _("Stacked")));
 		i = dynamic_cast<RadioMenuItem*> (&layers_items.back ());
-		i->set_active (overlaid == 0 && stacked != 0);
-		i->set_inconsistent (overlaid != 0 && stacked != 0);
-		i->signal_activate().connect (sigc::bind (sigc::mem_fun (*this, &RouteTimeAxisView::set_layer_display), Stacked, true));
-
-		if (unchangeable) {
-			i->set_sensitive (false);
-		}
+		i->set_active (layer_display() == Stacked);
+		i->signal_toggled().connect (sigc::bind (sigc::mem_fun (*this, &RouteTimeAxisView::layer_display_menu_change), i));
+		stacked_menu_item = i;
 
 		_ignore_set_layer_display = false;
 
@@ -716,13 +682,12 @@ RouteTimeAxisView::build_display_menu ()
 
 		RadioMenuItem::Group align_group;
 
-		/* Same verbose hacks as for the layering options above */
-
 		int existing = 0;
 		int capture = 0;
 		int automatic = 0;
 		int styles = 0;
 		boost::shared_ptr<Track> first_track;
+		TrackSelection const & s = _editor.get_selection().tracks;
 
 		for (TrackSelection::const_iterator t = s.begin(); t != s.end(); ++t) {
 			RouteTimeAxisView* r = dynamic_cast<RouteTimeAxisView*> (*t);
@@ -883,6 +848,22 @@ RouteTimeAxisView::build_display_menu ()
 	}
 	items.push_back (SeparatorElem());
 	items.push_back (MenuElem (_("Remove"), sigc::mem_fun(_editor, &PublicEditor::remove_tracks)));
+}
+
+void
+RouteTimeAxisView::layer_display_menu_change (Gtk::MenuItem* item)
+{
+	/* change only if the item is now active, since this will be called for
+	   both buttons as one becomes active and the other inactive.
+	*/
+
+	if (dynamic_cast<RadioMenuItem*>(item)->get_active()) {
+		if (item == stacked_menu_item) {
+			set_layer_display (Stacked);
+		} else {
+			set_layer_display (Overlaid);
+		}
+	}
 }
 
 void
@@ -1074,7 +1055,7 @@ RouteTimeAxisView::rename_current_playlist ()
 	string name;
 
 	boost::shared_ptr<Track> tr = track();
-	if (!tr || tr->destructive()) {
+	if (!tr) {
 		return;
 	}
 
@@ -1148,7 +1129,7 @@ RouteTimeAxisView::use_new_playlist (bool prompt, vector<boost::shared_ptr<Playl
 	string name;
 
 	boost::shared_ptr<Track> tr = track ();
-	if (!tr || tr->destructive()) {
+	if (!tr) {
 		return;
 	}
 
@@ -1216,7 +1197,7 @@ void
 RouteTimeAxisView::clear_playlist ()
 {
 	boost::shared_ptr<Track> tr = track ();
-	if (!tr || tr->destructive()) {
+	if (!tr) {
 		return;
 	}
 
@@ -1814,7 +1795,7 @@ RouteTimeAxisView::ensure_pan_views (bool show)
 		return;
 	}
 
-	set<Evoral::Parameter> params = _route->panner()->what_can_be_automated();
+	set<Evoral::Parameter> params = _route->pannable()->what_can_be_automated();
 	set<Evoral::Parameter>::iterator p;
 
 	for (p = params.begin(); p != params.end(); ++p) {
@@ -1829,7 +1810,7 @@ RouteTimeAxisView::ensure_pan_views (bool show)
 
 			/* we don't already have an AutomationTimeAxisView for this parameter */
 
-			std::string const name = _route->panner()->describe_parameter (pan_control->parameter ());
+			std::string const name = _route->pannable()->describe_parameter (pan_control->parameter ());
 
 			boost::shared_ptr<AutomationTimeAxisView> t (
 					new AutomationTimeAxisView (_session,
@@ -2045,13 +2026,32 @@ RouteTimeAxisView::add_existing_processor_automation_curves (boost::weak_ptr<Pro
 	}
 
 	set<Evoral::Parameter> existing;
-
 	processor->what_has_data (existing);
+
+	/* Also add explicitly visible */
+	const std::set<Evoral::Parameter>& automatable = processor->what_can_be_automated ();
+	for (std::set<Evoral::Parameter>::const_iterator i = automatable.begin(); i != automatable.end(); ++i) {
+		boost::shared_ptr<AutomationControl> control = boost::dynamic_pointer_cast<AutomationControl>(processor->control(*i, false));
+		if (!control) {
+			continue;
+		}
+		/* see also AutomationTimeAxisView::state_id() */
+		std::string ctrl_state_id = std::string("automation ") + control->id().to_s();
+		bool visible;
+		if (get_gui_property (ctrl_state_id, "visible", visible) && visible) {
+			existing.insert (*i);
+		}
+	}
 
 	for (set<Evoral::Parameter>::iterator i = existing.begin(); i != existing.end(); ++i) {
 
 		Evoral::Parameter param (*i);
 		boost::shared_ptr<AutomationLine> al;
+
+		boost::shared_ptr<AutomationControl> control = boost::dynamic_pointer_cast<AutomationControl>(processor->control(*i, false));
+		if (!control || control->flags () & Controllable::HiddenControl) {
+			continue;
+		}
 
 		if ((al = find_processor_automation_curve (processor, param)) != 0) {
 			al->queue_reset ();
@@ -2302,22 +2302,39 @@ RouteTimeAxisView::blink_rec_display (bool onoff)
 }
 
 void
-RouteTimeAxisView::set_layer_display (LayerDisplay d, bool apply_to_selection)
+RouteTimeAxisView::toggle_layer_display ()
+{
+	/* this is a bit of a hack, but we implement toggle via the menu items,
+	   in order to keep them in sync with the visual state.
+	*/
+
+	if (!is_track()) {
+		return;
+	}
+
+	if (!display_menu) {
+		build_display_menu ();
+	}
+
+	if (dynamic_cast<RadioMenuItem*>(overlaid_menu_item)->get_active()) {
+		dynamic_cast<RadioMenuItem*>(stacked_menu_item)->set_active (true);
+	} else {
+		dynamic_cast<RadioMenuItem*>(overlaid_menu_item)->set_active (true);
+	}
+}
+
+void
+RouteTimeAxisView::set_layer_display (LayerDisplay d)
 {
 	if (_ignore_set_layer_display) {
 		return;
 	}
 
-	if (apply_to_selection) {
-		_editor.get_selection().tracks.foreach_route_time_axis (boost::bind (&RouteTimeAxisView::set_layer_display, _1, d, false));
-	} else {
-
-		if (_view) {
-			_view->set_layer_display (d);
-		}
-
-		set_gui_property (X_("layer-display"), d);
+	if (_view) {
+		_view->set_layer_display (d);
 	}
+
+	set_gui_property (X_("layer-display"), d);
 }
 
 LayerDisplay
@@ -2387,6 +2404,15 @@ RouteTimeAxisView::io_changed (IOChange /*change*/, void */*src*/)
 {
 	reset_meter ();
 	if (_route && !no_redraw) {
+		AudioStreamView* asv = dynamic_cast<AudioStreamView*>(_view);
+		if (asv) {
+			/* this needs to happen with the disk-reader's I/O changed,
+			 * however there is no dedicated signal for this, and in almost
+			 * call cases it follows I/O changes.
+			 * This is similar to ARDOUR_UI::cleanup_peakfiles, and
+			 * re-loads wave-form displays. */
+			asv->reload_waves ();
+		}
 		request_redraw ();
 	}
 }

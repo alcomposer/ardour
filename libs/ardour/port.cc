@@ -76,7 +76,7 @@ Port::Port (std::string const & n, DataType t, PortFlags f)
 
 	if (!port_manager->running ()) {
 		DEBUG_TRACE (DEBUG::Ports, string_compose ("port-engine n/a postpone registering %1\n", name()));
-		_port_handle = 0; // created during ::reestablish() later
+		_port_handle.reset (); // created during ::reestablish() later
 	} else if ((_port_handle = port_engine.register_port (_name, t, _flags)) == 0) {
 		cerr << "Failed to register port \"" << _name << "\", reason is unknown from here\n";
 		throw failed_constructor ();
@@ -91,7 +91,7 @@ Port::Port (std::string const & n, DataType t, PortFlags f)
 /** Port destructor */
 Port::~Port ()
 {
-	DEBUG_TRACE (DEBUG::Destruction, string_compose ("destroying port @ %1 named %2\n", this, name()));
+	DEBUG_TRACE (PBD::DebugBits (DEBUG::Destruction|DEBUG::Ports), string_compose ("destroying port @ %1 named %2\n", this, name()));
 	drop ();
 }
 
@@ -139,7 +139,7 @@ Port::drop ()
 	if (_port_handle) {
 		DEBUG_TRACE (DEBUG::Ports, string_compose ("drop handle for port %1\n", name()));
 		port_engine.unregister_port (_port_handle);
-		_port_handle = 0;
+		_port_handle.reset ();;
 	}
 }
 

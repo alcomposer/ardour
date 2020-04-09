@@ -19,8 +19,8 @@
 #ifndef __ardour_instrument_info_h__
 #define __ardour_instrument_info_h__
 
-#include <string>
 #include <stdint.h>
+#include <string>
 
 #include <boost/weak_ptr.hpp>
 
@@ -28,13 +28,16 @@
 
 #include "evoral/Parameter.h"
 
-#include "midi++/libmidi_visibility.h"
 #include "ardour/libardour_visibility.h"
+#include "midi++/libmidi_visibility.h"
 
 namespace MIDI {
 	namespace Name {
 		class ChannelNameSet;
 		class Patch;
+		class ValueNameList;
+		class MasterDeviceNames;
+		class ControlNameList;
 		typedef std::list<boost::shared_ptr<Patch> > PatchNameList;
 	}
 }
@@ -43,40 +46,59 @@ namespace ARDOUR {
 
 class Processor;
 
-class LIBARDOUR_API InstrumentInfo {
-  public:
-    InstrumentInfo();
-    ~InstrumentInfo ();
+class LIBARDOUR_API InstrumentInfo
+{
+public:
+	InstrumentInfo ();
+	~InstrumentInfo ();
 
-    void set_external_instrument (const std::string& model, const std::string& mode);
-    void set_internal_instrument (boost::shared_ptr<ARDOUR::Processor>);
+	std::string model () const;
+	std::string mode () const;
 
-    std::string get_patch_name (uint16_t bank, uint8_t program, uint8_t channel) const;
-    std::string get_patch_name_without (uint16_t bank, uint8_t program, uint8_t channel) const;
-    std::string get_controller_name (Evoral::Parameter param) const;
-    std::string get_instrument_name () const;
+	void set_external_instrument (const std::string& model, const std::string& mode);
+	void set_internal_instrument (boost::shared_ptr<ARDOUR::Processor>);
 
-    boost::shared_ptr<MIDI::Name::ChannelNameSet> get_patches (uint8_t channel);
+	std::string get_note_name (uint16_t bank, uint8_t program, uint8_t channel, uint8_t note) const;
 
-    PBD::Signal0<void> Changed;
+	std::string get_patch_name (uint16_t bank, uint8_t program, uint8_t channel) const;
+	std::string get_patch_name_without (uint16_t bank, uint8_t program, uint8_t channel) const;
+	std::string get_controller_name (Evoral::Parameter param) const;
 
-    static const MIDI::Name::PatchNameList& general_midi_patches();
+	boost::shared_ptr<MIDI::Name::MasterDeviceNames> master_device_names () const;
 
-  private:
-    std::string external_instrument_model;
-    std::string external_instrument_mode;
+	boost::shared_ptr<MIDI::Name::ChannelNameSet>  get_patches (uint8_t channel);
+	boost::shared_ptr<MIDI::Name::ControlNameList> control_name_list (uint8_t channel);
 
-    boost::weak_ptr<ARDOUR::Processor> internal_instrument;
+	boost::shared_ptr<const MIDI::Name::ValueNameList> value_name_list_by_control (uint8_t channel, uint8_t number) const;
 
-    boost::shared_ptr<MIDI::Name::ChannelNameSet> plugin_programs_to_channel_name_set (boost::shared_ptr<Processor> p);
-    std::string get_plugin_patch_name (boost::shared_ptr<ARDOUR::Processor>, uint16_t bank, uint8_t program, uint8_t channel) const;
-    std::string get_plugin_controller_name (boost::shared_ptr<ARDOUR::Processor>, Evoral::Parameter) const;
+	size_t master_controller_count () const;
 
-    std::string get_patch_name (uint16_t bank, uint8_t program, uint8_t channel, bool with_extra) const;
-    static MIDI::Name::PatchNameList _gm_patches;
+	PBD::Signal0<void> Changed;
+
+	bool have_custom_plugin_info () const;
+
+private:
+	std::string get_patch_name (uint16_t bank, uint8_t program, uint8_t channel, bool with_extra) const;
+
+	void invalidate_cached_plugin_model ()
+	{
+		_plugin_model = "";
+		_plugin_mode = "";
+	}
+
+	void emit_changed ();
+
+	std::string _external_instrument_model;
+	std::string _external_instrument_mode;
+
+	mutable std::string _plugin_model;
+	mutable std::string _plugin_mode;
+
+	boost::weak_ptr<ARDOUR::Processor> internal_instrument;
+
+	PBD::ScopedConnection _midnam_changed;
 };
 
-} /* namespace ARDOUR */
-
+}
 
 #endif /* __ardour_instrument_info_h__ */

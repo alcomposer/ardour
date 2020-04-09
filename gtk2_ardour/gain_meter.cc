@@ -305,9 +305,7 @@ GainMeterBase::set_gain_astate (AutoState as)
 		ChangeGainAutomationState (as);
 		return;
 	}
-	if (_amp) {
-		_amp->set_parameter_automation_state (Evoral::Parameter (GainAutomation), as);
-	} else if (_control) {
+	if (_control) {
 		_control->set_automation_state (as);
 		_session->set_dirty ();
 	}
@@ -706,7 +704,7 @@ GainMeterBase::set_route_group_meter_point (Route& route, MeterPoint mp)
 	RouteGroup* route_group;
 
 	if ((route_group = route.route_group ()) != 0) {
-		route_group->foreach_route (boost::bind (&Route::set_meter_point, _1, mp, false));
+		route_group->foreach_route (boost::bind (&Route::set_meter_point, _1, mp));
 	} else {
 		route.set_meter_point (mp);
 	}

@@ -50,6 +50,7 @@
 #include "ardour/monitor_control.h"
 #include "ardour/internal_send.h"
 #include "ardour/panner_shell.h"
+#include "ardour/polarity_processor.h"
 #include "ardour/profile.h"
 #include "ardour/phase_control.h"
 #include "ardour/send.h"
@@ -76,6 +77,7 @@
 #include "keyboard.h"
 #include "latency_gui.h"
 #include "mixer_strip.h"
+#include "mixer_ui.h"
 #include "patch_change_widget.h"
 #include "plugin_pin_dialog.h"
 #include "rgb_macros.h"
@@ -177,6 +179,7 @@ RouteUI::init ()
 	multiple_mute_change = false;
 	multiple_solo_change = false;
 	_i_am_the_modifier = 0;
+	_n_polarity_invert = 0;
 
 	input_selector = 0;
 	output_selector = 0;
@@ -203,7 +206,7 @@ RouteUI::init ()
 
 	show_sends_button = manage (new ArdourButton);
 	show_sends_button->set_name ("send alert button");
-	UI::instance()->set_tip (show_sends_button, _("make mixer strips show sends to this bus"), "");
+	UI::instance()->set_tip (show_sends_button, _("Show the strips that send to this bus, and control them from the faders"), "");
 
 	monitor_input_button = new ArdourButton (ArdourButton::default_elements);
 	monitor_input_button->set_name ("monitor button");
@@ -339,8 +342,7 @@ RouteUI::set_route (boost::shared_ptr<Route> rp)
 	_route->solo_control()->Changed.connect (route_connections, invalidator (*this), boost::bind (&RouteUI::update_solo_display, this), gui_context());
 	_route->solo_safe_control()->Changed.connect (route_connections, invalidator (*this), boost::bind (&RouteUI::update_solo_display, this), gui_context());
 	_route->solo_isolate_control()->Changed.connect (route_connections, invalidator (*this), boost::bind (&RouteUI::update_solo_display, this), gui_context());
-	_route->phase_control()->Changed.connect (route_connections, invalidator (*this), boost::bind (&RouteUI::polarity_changed, this), gui_context());
-	_route->fan_out.connect (route_connections, invalidator (*this), boost::bind (&RouteUI::fan_out, this, false, true), gui_context());
+	_route->phase_control()->Changed.connect (route_connections, invalidator (*this), boost::bind (&RouteUI::update_polarity_display, this), gui_context());
 
 	if (is_track()) {
 		track()->FreezeChange.connect (*this, invalidator (*this), boost::bind (&RouteUI::map_frozen, this), gui_context());
@@ -351,7 +353,7 @@ RouteUI::set_route (boost::shared_ptr<Route> rp)
 	_route->PropertyChanged.connect (route_connections, invalidator (*this), boost::bind (&RouteUI::route_property_changed, this, _1), gui_context());
 	_route->presentation_info().PropertyChanged.connect (route_connections, invalidator (*this), boost::bind (&RouteUI::route_gui_changed, this, _1), gui_context ());
 
-	_route->io_changed.connect (route_connections, invalidator (*this), boost::bind (&RouteUI::setup_invert_buttons, this), gui_context ());
+	_route->polarity()->ConfigurationChanged.connect (route_connections, invalidator (*this), boost::bind (&RouteUI::setup_invert_buttons, this), gui_context());
 
 	if (_session->writable() && is_track()) {
 		boost::shared_ptr<Track> t = boost::dynamic_pointer_cast<Track>(_route);
@@ -394,7 +396,6 @@ RouteUI::set_route (boost::shared_ptr<Route> rp)
 	map_frozen ();
 
 	setup_invert_buttons ();
-	set_invert_button_state ();
 
 	boost::shared_ptr<Route> s = _showing_sends_to.lock ();
 	bus_send_display_changed (s);
@@ -410,16 +411,6 @@ RouteUI::set_route (boost::shared_ptr<Route> rp)
 	maybe_add_route_print_mgr ();
 	route_color_changed();
 	route_gui_changed (PropertyChange (Properties::selected));
-}
-
-void
-RouteUI::polarity_changed ()
-{
-	if (!_route) {
-		return;
-	}
-
-	set_invert_button_state ();
 }
 
 bool
@@ -1161,8 +1152,10 @@ RouteUI::show_sends_press(GdkEventButton* ev)
 
 			if (s == _route) {
 				set_showing_sends_to (boost::shared_ptr<Route> ());
+				Mixer_UI::instance()->show_spill (boost::shared_ptr<ARDOUR::Stripable>());
 			} else {
 				set_showing_sends_to (_route);
+				Mixer_UI::instance()->show_spill (_route);
 			}
 		}
 	}
@@ -2019,6 +2012,15 @@ RouteUI::parameter_changed (string const & p)
 void
 RouteUI::setup_invert_buttons ()
 {
+	uint32_t const N = _route ? _route->phase_control()->size() : 0;
+
+	if (_n_polarity_invert == N) {
+		/* buttons are already setup for this strip, but we should still set the values */
+		update_polarity_display ();
+		return;
+	}
+	_n_polarity_invert = N;
+
 	/* remove old invert buttons */
 	for (vector<ArdourButton*>::iterator i = _invert_buttons.begin(); i != _invert_buttons.end(); ++i) {
 		_invert_button_box.remove (**i);
@@ -2026,11 +2028,9 @@ RouteUI::setup_invert_buttons ()
 
 	_invert_buttons.clear ();
 
-	if (!_route || !_route->input()) {
+	if (N == 0) {
 		return;
 	}
-
-	uint32_t const N = _route->input()->n_ports().n_audio ();
 
 	uint32_t const to_add = (N <= _max_invert_buttons) ? N : 1;
 
@@ -2062,12 +2062,18 @@ RouteUI::setup_invert_buttons ()
 
 	_invert_button_box.set_spacing (1);
 	_invert_button_box.show_all ();
+
+	update_polarity_display ();
 }
 
 void
-RouteUI::set_invert_button_state ()
+RouteUI::update_polarity_display ()
 {
-	uint32_t const N = _route->input()->n_ports().n_audio();
+	if (!_route) {
+		return;
+	}
+
+	uint32_t const N = _route->phase_control()->size();
 	if (N > _max_invert_buttons) {
 
 		/* One button for many channels; explicit active if all channels are inverted,
@@ -2100,7 +2106,7 @@ bool
 RouteUI::invert_release (GdkEventButton* ev, uint32_t i)
 {
 	if (ev->button == 1 && i < _invert_buttons.size()) {
-		uint32_t const N = _route->input()->n_ports().n_audio ();
+		uint32_t const N = _route->phase_control()->size();
 		if (N <= _max_invert_buttons) {
 			/* left-click inverts phase so long as we have a button per channel */
 			_route->phase_control()->set_phase_invert (i, !_invert_buttons[i]->get_active());
@@ -2110,13 +2116,12 @@ RouteUI::invert_release (GdkEventButton* ev, uint32_t i)
 	return false;
 }
 
-
 bool
 RouteUI::invert_press (GdkEventButton* ev)
 {
 	using namespace Menu_Helpers;
 
-	uint32_t const N = _route->input()->n_ports().n_audio();
+	uint32_t const N = _route->phase_control()->size();
 	if (N <= _max_invert_buttons && ev->button != 3) {
 		/* If we have an invert button per channel, we only pop
 		   up a menu on right-click; left click is handled
@@ -2150,7 +2155,6 @@ RouteUI::invert_menu_toggled (uint32_t c)
 		return;
 	}
 
-
 	_route->phase_control()->set_phase_invert (c, !_route->phase_control()->inverted (c));
 }
 
@@ -2177,15 +2181,7 @@ void
 RouteUI::track_mode_changed (void)
 {
 	assert(is_track());
-	switch (track()->mode()) {
-		case ARDOUR::NonLayered:
-		case ARDOUR::Normal:
-			rec_enable_button->set_icon (ArdourIcon::RecButton);
-			break;
-		case ARDOUR::Destructive:
-			rec_enable_button->set_icon (ArdourIcon::RecTapeMode);
-			break;
-	}
+	rec_enable_button->set_icon (ArdourIcon::RecButton);
 	rec_enable_button->queue_draw();
 }
 
@@ -2325,110 +2321,7 @@ RouteUI::manage_pins ()
 void
 RouteUI::fan_out (bool to_busses, bool group)
 {
-	if (!ARDOUR_UI_UTILS::engine_is_running ()) {
-		return;
-	}
-
-	DisplaySuspender ds;
-	boost::shared_ptr<ARDOUR::Route> route = _route;
-	boost::shared_ptr<PluginInsert> pi = boost::dynamic_pointer_cast<PluginInsert> (route->the_instrument ());
-	assert (pi);
-
-	const uint32_t n_outputs = pi->output_streams ().n_audio ();
-	if (route->n_outputs ().n_audio () != n_outputs) {
-		MessageDialog msg (string_compose (
-					_("The Plugin's number of audio outputs ports (%1) does not match the Tracks's number of audio outputs (%2). Cannot fan out."),
-					n_outputs, route->n_outputs ().n_audio ()));
-		msg.run ();
-		return;
-	}
-
-#define BUSNAME  pd.group_name + "(" + route->name () + ")"
-
-	/* count busses and channels/bus */
-	boost::shared_ptr<Plugin> plugin = pi->plugin ();
-	std::map<std::string, uint32_t> busnames;
-	for (uint32_t p = 0; p < n_outputs; ++p) {
-		const Plugin::IOPortDescription& pd (plugin->describe_io_port (DataType::AUDIO, false, p));
-		std::string bn = BUSNAME;
-		busnames[bn]++;
-	}
-
-	if (busnames.size () < 2) {
-		MessageDialog msg (_("Instrument has only 1 output bus. Nothing to fan out."));
-		msg.run ();
-		return;
-	}
-
-	uint32_t outputs = 2;
-	if (_session->master_out ()) {
-		outputs = std::max (outputs, _session->master_out ()->n_inputs ().n_audio ());
-	}
-
-	route->output ()->disconnect (this);
-	route->panner_shell ()->set_bypassed (true);
-
-	boost::shared_ptr<AutomationControl> msac = route->master_send_enable_controllable ();
-	if (msac) {
-		msac->start_touch (msac->session().transport_sample());
-		msac->set_value (0, PBD::Controllable::NoGroup);
-	}
-
-	RouteList to_group;
-	for (uint32_t p = 0; p < n_outputs; ++p) {
-		const Plugin::IOPortDescription& pd (plugin->describe_io_port (DataType::AUDIO, false, p));
-		std::string bn = BUSNAME;
-		boost::shared_ptr<Route> r = _session->route_by_name (bn);
-		if (!r) {
-			try {
-				if (to_busses) {
-					RouteList rl = _session->new_audio_route (busnames[bn], outputs, NULL, 1, bn, PresentationInfo::AudioBus, PresentationInfo::max_order);
-					r = rl.front ();
-					assert (r);
-				} else {
-					list<boost::shared_ptr<AudioTrack> > tl =
-						_session->new_audio_track (busnames[bn], outputs, NULL, 1, bn, PresentationInfo::max_order, Normal);
-					r = tl.front ();
-					assert (r);
-
-					boost::shared_ptr<ControlList> cl (new ControlList);
-					cl->push_back (r->monitoring_control ());
-					_session->set_controls (cl, (double) MonitorInput, Controllable::NoGroup);
-				}
-			} catch (...) {
-				if (!to_group.empty()) {
-					boost::shared_ptr<RouteList> rl (&to_group);
-					_session->remove_routes (rl);
-				}
-				return;
-			}
-			r->input ()->disconnect (this);
-		}
-		to_group.push_back (r);
-		route->output ()->audio (p)->connect (r->input ()->audio (pd.group_channel).get());
-	}
-#undef BUSNAME
-
-	if (group) {
-		RouteGroup* rg = NULL;
-		const std::list<RouteGroup*>& rgs (_session->route_groups ());
-		for (std::list<RouteGroup*>::const_iterator i = rgs.begin (); i != rgs.end (); ++i) {
-			if ((*i)->name () == pi->name ()) {
-				rg = *i;
-				break;
-			}
-		}
-		if (!rg) {
-			rg = new RouteGroup (*_session, pi->name ());
-			_session->add_route_group (rg);
-			rg->set_gain (false);
-		}
-
-		GroupTabs::set_group_color (rg, route->presentation_info().color());
-		for (RouteList::const_iterator i = to_group.begin(); i != to_group.end(); ++i) {
-			rg->add (*i);
-		}
-	}
+	Mixer_UI::instance()->fan_out (_route, to_busses, group);
 }
 
 bool

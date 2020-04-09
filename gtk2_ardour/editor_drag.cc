@@ -2484,15 +2484,9 @@ RegionCreateDrag::motion (GdkEvent* event, bool first_move)
 				_region->set_initial_position (f);
 			}
 
-			/* Don't use a zero-length region, and subtract 1 sample from the snapped length
-			   so that if this region is duplicated, its duplicate starts on
-			   a snap point rather than 1 sample after a snap point.  Otherwise things get
-			   a bit confusing as if a region starts 1 sample after a snap point, one cannot
-			   place snapped notes at the start of the region.
-			*/
 			if (f != grab_sample()) {
-				samplecnt_t const len = (samplecnt_t) fabs ((double)(f - grab_sample () - 1));
-				_region->set_length (len < 1 ? 1 : len, _editor->get_grid_music_divisions (event->button.state));
+				samplecnt_t const len = ::llabs (f - grab_sample ());
+				_region->set_length (len, _editor->get_grid_music_divisions (event->button.state));
 			}
 		}
 	}
@@ -3997,6 +3991,7 @@ void
 CursorDrag::start_grab (GdkEvent* event, Gdk::Cursor* c)
 {
 	Drag::start_grab (event, c);
+
 	setup_snap_delta (MusicSample (_editor->playhead_cursor->current_sample(), 0));
 
 	_grab_zoom = _editor->samples_per_pixel;
@@ -4004,6 +3999,7 @@ CursorDrag::start_grab (GdkEvent* event, Gdk::Cursor* c)
 	MusicSample where (_editor->canvas_event_sample (event) + snap_delta (event->button.state), 0);
 
 	_editor->snap_to_with_modifier (where, event);
+
 	_editor->_dragging_playhead = true;
 	_editor->_control_scroll_target = where.sample;
 
@@ -4040,7 +4036,7 @@ CursorDrag::start_grab (GdkEvent* event, Gdk::Cursor* c)
 	}
 
 	fake_locate (where.sample - snap_delta (event->button.state));
-	
+
 	_last_y_delta = 0;
 }
 
@@ -4054,10 +4050,10 @@ CursorDrag::motion (GdkEvent* event, bool)
 	if (where.sample != last_pointer_sample()) {
 		fake_locate (where.sample - snap_delta (event->button.state));
 	}
-	
+
 	//maybe do zooming, too, if the option is enabled
 	if (UIConfiguration::instance ().get_use_time_rulers_to_zoom_with_vertical_drag () ) {
-	
+
 		//To avoid accidental zooming, the mouse must move exactly vertical, not diagonal, to trigger a zoom step
 		//we use screen coordinates for this, not canvas-based grab_x
 		double mx = event->button.x;
@@ -4104,8 +4100,8 @@ CursorDrag::finished (GdkEvent* event, bool movement_occurred)
 
 	Session* s = _editor->session ();
 	if (s) {
-		s->request_locate (_editor->playhead_cursor->current_sample (), _was_rolling ? MustRoll : MustStop);
 		_editor->_pending_locate_request = true;
+		s->request_locate (_editor->playhead_cursor->current_sample (), _was_rolling ? MustRoll : MustStop);
 		s->request_resume_timecode_transmission ();
 	}
 }
@@ -4415,7 +4411,6 @@ MarkerDrag::start_grab (GdkEvent* event, Gdk::Cursor* cursor)
 	bool is_start;
 
 	Location *location = _editor->find_location_from_marker (_marker, is_start);
-	_editor->_dragging_edit_point = true;
 
 	update_item (location);
 
@@ -4719,8 +4714,6 @@ MarkerDrag::finished (GdkEvent* event, bool movement_occurred)
 
 		return;
 	}
-
-	_editor->_dragging_edit_point = false;
 
 	XMLNode &before = _editor->session()->locations()->get_state();
 	bool in_command = false;
@@ -6336,7 +6329,7 @@ AutomationRangeDrag::setup (list<boost::shared_ptr<AutomationLine> > const & lin
 			r.first = 0;
 			r.second = max_samplepos;
 		}
-		
+
 		/* check this range against all the AudioRanges that we are using */
 		list<AudioRange>::const_iterator k = _ranges.begin ();
 		while (k != _ranges.end()) {

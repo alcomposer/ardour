@@ -97,8 +97,6 @@ public:
 	void set_record_enabled (bool yn);
 	void set_record_safe (bool yn);
 
-	bool destructive () const { return _flags & Destructive; }
-
 	/** @return Start position of currently-running capture (in session samples) */
 	samplepos_t current_capture_start () const { return _capture_start_sample; }
 	samplepos_t current_capture_end () const { return _capture_start_sample + _capture_captured; }
@@ -143,14 +141,14 @@ protected:
 
 	virtual XMLNode& state ();
 
+	int use_playlist (DataType, boost::shared_ptr<Playlist>);
+
 	int do_flush (RunContext context, bool force = false);
 
 private:
 	static samplecnt_t _chunk_samples;
 
 	void prepare_record_status (samplepos_t /*capture_start_sample*/);
-	void setup_destructive_playlist ();
-	void use_destructive_playlist ();
 
 	int add_channel_to (boost::shared_ptr<ChannelList>, uint32_t how_many);
 

@@ -167,6 +167,8 @@ public:
 	void             first_idle ();
 	virtual bool     have_idled () const { return _have_idled; }
 
+	bool pending_locate_request() const { return _pending_locate_request; }
+
 	samplepos_t leftmost_sample() const { return _leftmost_sample; }
 
 	samplecnt_t current_page_samples() const {
@@ -1425,12 +1427,17 @@ private:
 	/* import specific info */
 
 	struct EditorImportStatus : public ARDOUR::ImportStatus {
-	    Editing::ImportMode mode;
-	    samplepos_t pos;
-	    int target_tracks;
-	    int target_regions;
-	    boost::shared_ptr<ARDOUR::Track> track;
-	    bool replace;
+		void clear () {
+			ARDOUR::ImportStatus::clear ();
+			track.reset ();
+		}
+
+		Editing::ImportMode mode;
+		samplepos_t pos;
+		int target_tracks;
+		int target_regions;
+		boost::shared_ptr<ARDOUR::Track> track;
+		bool replace;
 	};
 
 	EditorImportStatus import_status;
@@ -1501,6 +1508,9 @@ private:
 	void remove_location_at_playhead_cursor ();
 	bool select_new_marker;
 
+	void toggle_all_existing_automation ();
+	void toggle_layer_display ();
+
 	void reverse_selection ();
 	void edit_envelope ();
 
@@ -1559,7 +1569,6 @@ private:
 	std::set<boost::shared_ptr<ARDOUR::Playlist> > motion_frozen_playlists;
 
 	bool _dragging_playhead;
-	bool _dragging_edit_point;
 
 	void marker_drag_motion_callback (GdkEvent*);
 	void marker_drag_finished_callback (GdkEvent*);

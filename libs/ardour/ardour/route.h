@@ -190,7 +190,7 @@ public:
 	void set_denormal_protection (bool yn);
 	bool denormal_protection() const;
 
-	void         set_meter_point (MeterPoint, bool force = false);
+	void         set_meter_point (MeterPoint);
 	bool         apply_processor_changes_rt ();
 	void         emit_pending_signals ();
 	MeterPoint   meter_point() const { return _pending_meter_point; }
@@ -205,6 +205,7 @@ public:
 
 	boost::shared_ptr<Amp> amp() const  { return _amp; }
 	boost::shared_ptr<Amp> trim() const { return _trim; }
+	boost::shared_ptr<PolarityProcessor> polarity() const { return _polarity; }
 	boost::shared_ptr<PeakMeter>       peak_meter()       { return _meter; }
 	boost::shared_ptr<const PeakMeter> peak_meter() const { return _meter; }
 	boost::shared_ptr<PeakMeter> shared_peak_meter() const { return _meter; }
@@ -383,11 +384,14 @@ public:
 		MultiOut = 0x2,
 	};
 
-	static PBD::Signal3<int,boost::shared_ptr<Route>, boost::shared_ptr<PluginInsert>, PluginSetupOptions > PluginSetup;
+	/** ask GUI about port-count, fan-out when adding instrument */
+	static PBD::Signal3<int, boost::shared_ptr<Route>, boost::shared_ptr<PluginInsert>, PluginSetupOptions > PluginSetup;
+
+	/** used to signal the GUI to fan-out (track-creation) */
+	static PBD::Signal1<void, boost::weak_ptr<Route> > FanOut;
 
 	/** the processors have changed; the parameter indicates what changed */
 	PBD::Signal1<void,RouteProcessorChange> processors_changed;
-	PBD::Signal0<void> fan_out; // used to signal the GUI to fan-out (track-creation)
 	PBD::Signal1<void,void*> record_enable_changed;
 	/** a processor's latency has changed
 	 * (emitted from PluginInsert::latency_changed)
@@ -606,6 +610,8 @@ protected:
 
 	samplecnt_t  bounce_get_latency (boost::shared_ptr<Processor> endpoint, bool include_endpoint, bool for_export, bool for_freeze) const;
 	ChanCount    bounce_get_output_streams (ChanCount &cc, boost::shared_ptr<Processor> endpoint, bool include_endpoint, bool for_export, bool for_freeze) const;
+
+	bool can_freeze_processor (boost::shared_ptr<Processor>, bool allow_routing = false) const;
 
 	bool           _active;
 	samplecnt_t    _signal_latency;

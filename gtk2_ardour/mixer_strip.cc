@@ -284,6 +284,7 @@ MixerStrip::init ()
 	trim_control.StopGesture.connect(sigc::mem_fun(*this, &MixerStrip::trim_end_touch));
 	input_button_box.pack_start (trim_control, false, false);
 
+	global_vpacker.set_no_show_all ();
 	global_vpacker.set_border_width (1);
 	global_vpacker.set_spacing (0);
 
@@ -662,8 +663,17 @@ MixerStrip::set_route (boost::shared_ptr<Route> rt)
 		/* non-master bus */
 
 		if (!_route->is_master()) {
-			rec_mon_table.attach (*show_sends_button, 0, 1, 0, 2);
-			show_sends_button->show();
+			if (ARDOUR::Profile->get_mixbus()) {
+				rec_mon_table.attach (*show_sends_button, 0, 3, 0, 2);
+			} else {
+				rec_mon_table.attach (*show_sends_button, 0, 2, 0, 2);
+			}
+
+			if (_mixer_owned) {
+				show_sends_button->show();
+			} else {
+				show_sends_button->hide();
+			}
 		}
 	}
 
@@ -690,8 +700,6 @@ MixerStrip::set_route (boost::shared_ptr<Route> rt)
 
 	/* now force an update of all the various elements */
 
-	update_mute_display ();
-	update_solo_display ();
 	name_changed ();
 	comment_changed ();
 	route_group_changed ();
@@ -782,14 +790,14 @@ MixerStrip::set_width_enum (Width w, void* owner)
 	gpm.gain_automation_state_button.set_text (GainMeterBase::short_astate_string (gain_automation->automation_state()));
 
 	if (_route->panner()) {
-		((Gtk::Label*)panners.pan_automation_state_button.get_child())->set_text (GainMeterBase::short_astate_string (_route->panner()->automation_state()));
+		((Gtk::Label*)panners.pan_automation_state_button.get_child())->set_text (GainMeterBase::short_astate_string (_route->pannable()->automation_state()));
 	}
 
 	switch (w) {
 	case Wide:
 
 		if (show_sends_button)  {
-			show_sends_button->set_text (_("Aux"));
+			show_sends_button->set_text (_("Show Sends"));
 		}
 
 		{
@@ -803,7 +811,7 @@ MixerStrip::set_width_enum (Width w, void* owner)
 	case Narrow:
 
 		if (show_sends_button) {
-			show_sends_button->set_text (_("Snd"));
+			show_sends_button->set_text (_("Show"));
 		}
 
 		gain_meter().setup_meters (); // recalc meter width
@@ -1966,7 +1974,6 @@ MixerStrip::map_frozen ()
 	boost::shared_ptr<AudioTrack> at = audio_track();
 
 	bool en   = _route->active () || ARDOUR::Profile->get_mixbus();
-	bool send = _current_delivery && boost::dynamic_pointer_cast<Send>(_current_delivery) != 0;
 
 	if (at) {
 		switch (at->freeze_state()) {
@@ -1975,11 +1982,11 @@ MixerStrip::map_frozen ()
 			hide_redirect_editors ();
 			break;
 		default:
-			processor_box.set_sensitive (en && !send);
+			processor_box.set_sensitive (en);
 			break;
 		}
 	} else {
-		processor_box.set_sensitive (en && !send);
+		processor_box.set_sensitive (en);
 	}
 	RouteUI::map_frozen ();
 }

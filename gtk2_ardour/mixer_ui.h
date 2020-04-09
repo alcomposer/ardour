@@ -127,6 +127,7 @@ public:
 	void do_vca_unassign (boost::shared_ptr<ARDOUR::VCA>);
 	void show_spill (boost::shared_ptr<ARDOUR::Stripable>);
 	bool showing_spill_for (boost::shared_ptr<ARDOUR::Stripable>) const;
+	void fan_out (boost::weak_ptr<ARDOUR::Route>, bool to_busses, bool group);
 
 	sigc::signal1<void,boost::shared_ptr<ARDOUR::Stripable> > show_spill_change;
 
@@ -246,7 +247,7 @@ private:
 	void track_name_changed (MixerStrip *);
 
 	void redisplay_track_list ();
-	void spill_redisplay (boost::shared_ptr<ARDOUR::VCA>);
+	void spill_redisplay (boost::shared_ptr<ARDOUR::Stripable>);
 	bool no_track_list_redisplay;
 	bool track_display_button_press (GdkEventButton*);
 	void strip_width_changed ();

@@ -92,8 +92,6 @@ AudioEngine::AudioEngine ()
 	, _mtdm (0)
 	, _mididm (0)
 	, _measuring_latency (MeasureNone)
-	, _latency_input_port (0)
-	, _latency_output_port (0)
 	, _latency_flush_samples (0)
 	, _latency_signal_latency (0)
 	, _stopped_for_latency (false)
@@ -288,9 +286,12 @@ AudioEngine::process_callback (pframes_t nframes)
 		--_init_countdown;
 		/* Warm up caches */
 		PortManager::cycle_start (nframes);
-		PortManager::silence (nframes);
 		_session->process (nframes);
+		PortManager::silence (nframes);
 		PortManager::cycle_end (nframes);
+		if (_init_countdown == 0) {
+			_session->reset_xrun_count();
+		}
 		return 0;
 	}
 
@@ -421,9 +422,14 @@ AudioEngine::process_callback (pframes_t nframes)
 	}
 
 	if (!_freewheeling || Freewheel.empty()) {
-		const double engine_speed = tmm.pre_process_transport_masters (nframes, sample_time_at_cycle_start());
-		Port::set_speed_ratio (engine_speed);
-		DEBUG_TRACE (DEBUG::Slave, string_compose ("transport master (current=%1) gives speed %2 (ports using %3)\n", tmm.current() ? tmm.current()->name() : string("[]"), engine_speed, Port::speed_ratio()));
+		/* catch_speed is the speed that we estimate we need to run at
+		   to catch (or remain locked to) a transport master.
+		*/
+		double catch_speed = tmm.pre_process_transport_masters (nframes, sample_time_at_cycle_start());
+		catch_speed = _session->plan_master_strategy (nframes, tmm.get_current_speed_in_process_context(), tmm.get_current_position_in_process_context(), catch_speed);
+		Port::set_speed_ratio (catch_speed);
+		DEBUG_TRACE (DEBUG::Slave, string_compose ("transport master (current=%1) gives speed %2 (ports using %3)\n", tmm.current() ? tmm.current()->name() : string("[]"), catch_speed, Port::speed_ratio()));
+
 #if 0 // USE FOR DEBUG ONLY
 		/* use with Dummy backend, engine pulse and
 		 * scripts/_find_nonzero_sample.lua
@@ -590,6 +596,7 @@ void
 AudioEngine::do_reset_backend()
 {
 	SessionEvent::create_per_thread_pool (X_("Backend reset processing thread"), 1024);
+	pthread_set_name ("EngineWatchdog");
 
 	Glib::Threads::Mutex::Lock guard (_reset_request_lock);
 
@@ -650,6 +657,7 @@ void
 AudioEngine::do_devicelist_update()
 {
 	SessionEvent::create_per_thread_pool (X_("Device list update processing thread"), 512);
+	pthread_set_name ("DeviceList");
 
 	Glib::Threads::Mutex::Lock guard (_devicelist_update_lock);
 
@@ -718,7 +726,7 @@ AudioEngine::set_session (Session *s)
 	SessionHandlePtr::set_session (s);
 
 	if (_session) {
-		_init_countdown = 8;
+		_init_countdown = std::max (8, (int)(_backend->sample_rate () / _backend->buffer_size ()) / 4);
 	}
 }
 
@@ -1056,8 +1064,8 @@ AudioEngine::stop (bool for_latency)
 	}
 	_processed_samples = 0;
 	_measuring_latency = MeasureNone;
-	_latency_output_port = 0;
-	_latency_input_port = 0;
+	_latency_output_port.reset ();
+	_latency_input_port.reset ();
 
 	if (stop_engine) {
 		Port::PortDrop ();
@@ -1563,11 +1571,11 @@ AudioEngine::stop_latency_detection ()
 
 	if (_latency_output_port) {
 		port_engine().unregister_port (_latency_output_port);
-		_latency_output_port = 0;
+		_latency_output_port.reset();
 	}
 	if (_latency_input_port) {
 		port_engine().unregister_port (_latency_input_port);
-		_latency_input_port = 0;
+		_latency_input_port.reset();
 	}
 
 	if (_running && _backend->can_change_systemic_latency_when_running()) {

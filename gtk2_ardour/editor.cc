@@ -373,7 +373,6 @@ Editor::Editor ()
 	, lock_dialog (0)
 	  /* , last_event_time { 0, 0 } */ /* this initialization style requires C++11 */
 	, _dragging_playhead (false)
-	, _dragging_edit_point (false)
 	, _follow_playhead (true)
 	, _stationary_playhead (false)
 	, _maximised (false)
@@ -1256,7 +1255,9 @@ Editor::map_position_change (samplepos_t sample)
 		center_screen (sample);
 	}
 
-	playhead_cursor->set_position (sample);
+	if (!_session->locate_initiated()) {
+		playhead_cursor->set_position (sample);
+	}
 }
 
 void
@@ -1592,7 +1593,7 @@ Editor::popup_track_context_menu (int button, int32_t time, ItemType item_type, 
 		break;
 
 	case StreamItem:
-		if (clicked_routeview->track()) {
+		if (clicked_routeview != 0 && clicked_routeview->track()) {
 			build_menu_function = &Editor::build_track_context_menu;
 		} else {
 			build_menu_function = &Editor::build_track_bus_context_menu;
@@ -2689,7 +2690,7 @@ Editor::snap_to (MusicSample& start, RoundMode direction, SnapPref pref, bool en
 	snap_to_internal (start, direction, pref, ensure_snap);
 }
 
-void
+static void
 check_best_snap (samplepos_t presnap, samplepos_t &test, samplepos_t &dist, samplepos_t &best)
 {
 	samplepos_t diff = abs (test - presnap);
@@ -2939,12 +2940,14 @@ Editor::snap_to_marker (samplepos_t presnap, RoundMode direction)
 	samplepos_t after;
 	samplepos_t test;
 
+	if (_session->locations()->list().empty()) {
+		/* No marks to snap to, so just don't snap */
+		return 0;
+	}
+
 	_session->locations()->marks_either_side (presnap, before, after);
 
-	if (before == max_samplepos && after == max_samplepos) {
-		/* No marks to snap to, so just don't snap */
-		return presnap;
-	} else if (before == max_samplepos) {
+	if (before == max_samplepos) {
 		test = after;
 	} else if (after == max_samplepos) {
 		test = before;
@@ -2968,6 +2971,7 @@ Editor::snap_to_marker (samplepos_t presnap, RoundMode direction)
 void
 Editor::snap_to_internal (MusicSample& start, RoundMode direction, SnapPref pref, bool ensure_snap)
 {
+	UIConfiguration const& uic (UIConfiguration::instance ());
 	const samplepos_t presnap = start.sample;
 
 	samplepos_t test = max_samplepos; // for each snap, we'll use this value
@@ -2975,30 +2979,28 @@ Editor::snap_to_internal (MusicSample& start, RoundMode direction, SnapPref pref
 	samplepos_t best = max_samplepos; // this records the best snap-result we've found so far
 
 	/* check snap-to-marker */
-	if ((pref == SnapToAny_Visual) && UIConfiguration::instance().get_snap_to_marks()) {
+	if ((pref == SnapToAny_Visual) && uic.get_snap_to_marks ()) {
 		test = snap_to_marker (presnap, direction);
-		check_best_snap(presnap, test, dist, best);
+		check_best_snap (presnap, test, dist, best);
 	}
 
 	/* check snap-to-region-{start/end/sync} */
-	if (
-		(pref == SnapToAny_Visual) &&
-		(UIConfiguration::instance().get_snap_to_region_start() || UIConfiguration::instance().get_snap_to_region_end() || UIConfiguration::instance().get_snap_to_region_sync())
-		) {
-		if (!region_boundary_cache.empty()) {
+	if ((pref == SnapToAny_Visual) && (uic.get_snap_to_region_start () || uic.get_snap_to_region_end () || uic.get_snap_to_region_sync ())) {
 
-			vector<samplepos_t>::iterator prev = region_boundary_cache.begin();
-			vector<samplepos_t>::iterator next = std::upper_bound (region_boundary_cache.begin(), region_boundary_cache.end(), presnap);
+		if (!region_boundary_cache.empty ()) {
+
+			vector<samplepos_t>::iterator prev = region_boundary_cache.begin ();
+			vector<samplepos_t>::iterator next = std::upper_bound (region_boundary_cache.begin (), region_boundary_cache.end (), presnap);
 			if (next != region_boundary_cache.begin ()) {
 				prev = next;
 				prev--;
 			}
 
-			if ((direction == RoundUpMaybe || direction == RoundUpAlways))
+			if ((direction == RoundUpMaybe || direction == RoundUpAlways)) {
 				test = *next;
-			else if ((direction == RoundDownMaybe || direction == RoundDownAlways))
+			} else if ((direction == RoundDownMaybe || direction == RoundDownAlways)) {
 				test = *prev;
-			else if (direction ==  0) {
+			} else if (direction ==  0) {
 				if ((presnap - *prev) < (*next - presnap)) {
 					test = *prev;
 				} else {
@@ -3008,32 +3010,28 @@ Editor::snap_to_internal (MusicSample& start, RoundMode direction, SnapPref pref
 
 		}
 
-		check_best_snap(presnap, test, dist, best);
+		check_best_snap (presnap, test, dist, best);
 	}
 
 	/* check Grid */
-	if (UIConfiguration::instance().get_snap_to_grid() && (_grid_type != GridTypeNone)) {
-		MusicSample pre(presnap, 0);
+	if (uic.get_snap_to_grid () && (_grid_type != GridTypeNone)) {
+		MusicSample pre (presnap, 0);
 		MusicSample post = snap_to_grid (pre, direction, pref);
-		check_best_snap(presnap, post.sample, dist, best);
+		check_best_snap (presnap, post.sample, dist, best);
+	}
+
+	if (max_samplepos == best) {
+		return;
 	}
 
 	/* now check "magnetic" state: is the grid within reasonable on-screen distance to trigger a snap?
 	 * this also helps to avoid snapping to somewhere the user can't see.  (i.e.: I clicked on a region and it disappeared!!)
 	 * ToDo: Perhaps this should only occur if EditPointMouse?
 	 */
-	int snap_threshold_s = pixel_to_sample(UIConfiguration::instance().get_snap_threshold());
-	if (ensure_snap) {
-		start.set (best, 0);
+	samplecnt_t snap_threshold_s = pixel_to_sample (uic.get_snap_threshold ());
+
+	if (!ensure_snap && ::llabs (presnap - best) > snap_threshold_s) {
 		return;
-	} else if (presnap > best) {
-		if (presnap > (best+ snap_threshold_s)) {
-			best = presnap;
-		}
-	} else if (presnap < best) {
-		if (presnap < (best - snap_threshold_s)) {
-			 best = presnap;
-		}
 	}
 
 	start.set (best, 0);
@@ -5922,9 +5920,11 @@ Editor::super_rapid_screen_update ()
 			snapped_cursor->set_position (ms.sample);
 			snapped_cursor->show ();
 		}
-	} else if (mouse_sample (where.sample, ignored)) { // cursor is in the editing canvas. show it.
+	} else if (_edit_point == EditAtMouse && mouse_sample (where.sample, ignored)) {
+		/* cursor is in the editing canvas. show it. */
 		snapped_cursor->show ();
-	} else { // mouse is out of the editing canvas. hide the snapped_cursor
+	} else {
+		/* mouse is out of the editing canvas, or edit-point isn't mouse. Hide the snapped_cursor */
 		snapped_cursor->hide ();
 	}
 
@@ -5951,7 +5951,9 @@ Editor::super_rapid_screen_update ()
 		return;
 	}
 
-	playhead_cursor->set_position (sample);
+	if (!_pending_locate_request) {
+		playhead_cursor->set_position (sample);
+	}
 
 	if (_session->requested_return_sample() >= 0) {
 		_last_update_time = 0;

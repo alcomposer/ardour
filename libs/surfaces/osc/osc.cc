@@ -628,6 +628,7 @@ OSC::register_callbacks()
 		REGISTER_CALLBACK (serv, X_("/select/eq_q"), "if", sel_eq_q);
 		REGISTER_CALLBACK (serv, X_("/select/eq_shape"), "if", sel_eq_shape);
 		REGISTER_CALLBACK (serv, X_("/select/add_personal_send"), "s", sel_new_personal_send);
+		REGISTER_CALLBACK (serv, X_("/select/add_fldbck_send"), "s", sel_new_personal_send);
 
 		/* These commands require the route index in addition to the arg; TouchOSC (et al) can't use these  */
 		REGISTER_CALLBACK (serv, X_("/strip/mute"), "ii", route_mute);
@@ -1230,13 +1231,10 @@ OSC::routes_list (lo_message msg)
 				lo_message_add_string (reply, "MO");
 			} else if (boost::dynamic_pointer_cast<Route>(s) && !boost::dynamic_pointer_cast<Track>(s)) {
 				if (!(s->presentation_info().flags() & PresentationInfo::MidiBus)) {
-					// r->feeds (session->master_out()) may make more sense
-					if (session->master_out() && r->direct_feeds_according_to_reality (session->master_out())) {
-						// this is a bus
-						lo_message_add_string (reply, "B");
+					if (s->is_foldbackbus()) {
+						lo_message_add_string (reply, "FB");
 					} else {
-						// this is an Aux out
-						lo_message_add_string (reply, "AX");
+						lo_message_add_string (reply, "B");
 					}
 				} else {
 					lo_message_add_string (reply, "MB");
@@ -2243,6 +2241,7 @@ OSC::global_feedback (OSCSurface* sur)
 	OSCGlobalObserver* o = sur->global_obs;
 	if (o) {
 		delete o;
+		sur->global_obs = 0;
 	}
 	if (sur->feedback[4] || sur->feedback[3] || sur->feedback[5] || sur->feedback[6]) {
 
@@ -3083,32 +3082,25 @@ OSC::_sel_plugin (int id, lo_address addr)
 			return 1;
 		}
 
-		// find out how many plugins we have
-		bool plugs;
-		int nplugs  = 0;
+		/* find out how many plugins we have */
 		sur->plugins.clear();
-		do {
-			plugs = false;
-			if (r->nth_plugin (nplugs)) {
-				if (r->nth_plugin(nplugs)->display_to_user()) {
-#ifdef MIXBUS
-					// need to check for mixbus channel strips (and exclude them)
-					boost::shared_ptr<Processor> proc = r->nth_plugin (nplugs);
-					boost::shared_ptr<PluginInsert> pi;
-					if ((pi = boost::dynamic_pointer_cast<PluginInsert>(proc))) {
-
-						if (!pi->is_channelstrip()) {
-#endif
-							sur->plugins.push_back (nplugs);
-							nplugs++;
-#ifdef MIXBUS
-						}
-					}
-#endif
-				}
-				plugs = true;
+		for (int nplugs = 0; true; ++nplugs) {
+			boost::shared_ptr<Processor> proc = r->nth_plugin (nplugs);
+			if (!proc) {
+				break;
 			}
-		} while (plugs);
+			if (!r->nth_plugin(nplugs)->display_to_user()) {
+				continue;
+			}
+#ifdef MIXBUS
+			/* need to check for mixbus channel strips (and exclude them) */
+			boost::shared_ptr<PluginInsert> pi = boost::dynamic_pointer_cast<PluginInsert>(proc);
+			if (pi && pi->is_channelstrip()) {
+				continue;
+			}
+#endif
+			sur->plugins.push_back (nplugs);
+		}
 
 		// limit plugin_id to actual plugins
 		if (sur->plugins.size() < 1) {
@@ -3182,7 +3174,7 @@ OSC::transport_speed (lo_message msg)
 		return;
 	}
 	check_surface (msg);
-	double ts = session->transport_speed ();
+	double ts = get_transport_speed();
 
 	lo_message reply = lo_message_new ();
 	lo_message_add_double (reply, ts);
@@ -5144,15 +5136,11 @@ OSC::route_set_send_gain_dB (int ssid, int id, float val, lo_message msg)
 		if (id > 0) {
 			--id;
 		}
-#ifdef MIXBUS
-		abs = val;
-#else
 		if (val < -192) {
 			abs = 0;
 		} else {
 			abs = dB_to_coefficient (val);
 		}
-#endif
 		if (s->send_level_controllable (id)) {
 			s->send_level_controllable (id)->set_value (abs, sur->usegroup);
 			return 0;
@@ -5200,15 +5188,11 @@ OSC::sel_sendgain (int id, float val, lo_message msg)
 		if (id > 0) {
 			send_id = id - 1;
 		}
-#ifdef MIXBUS
-		abs = val;
-#else
 		if (val < -192) {
 			abs = 0;
 		} else {
 			abs = dB_to_coefficient (val);
 		}
-#endif
 		if (sur->send_page_size) {
 			send_id = send_id + ((sur->send_page - 1) * sur->send_page_size);
 		}
@@ -6420,8 +6404,8 @@ OSC::cue_parse (const char *path, const char* types, lo_arg **argv, int argc, lo
 		}
 	}
 	int ret = 1; /* unhandled */
-	if (!strncmp (path, X_("/cue/aux"), 8)) {
-		// set our Aux bus
+	if (!strncmp (path, X_("/cue/bus"), 8) || !strncmp (path, X_("/cue/aux"), 8)) {
+		// set our Foldback bus
 		if (argc) {
 			if (value) {
 				ret = cue_set ((uint32_t) value, msg);
@@ -6430,8 +6414,8 @@ OSC::cue_parse (const char *path, const char* types, lo_arg **argv, int argc, lo
 			}
 		}
 	}
-	else if (!strncmp (path, X_("/cue/connect_aux"), 16)) {
-		// Create new Aux bus
+	else if (!strncmp (path, X_("/cue/connect_output"), 16) || !strncmp (path, X_("/cue/connect_aux"), 16)) {
+		// connect Foldback bus output
 		string dest = "";
 		if (argc == 1 && types[0] == 's') {
 			dest = &argv[0]->s;
@@ -6448,7 +6432,7 @@ OSC::cue_parse (const char *path, const char* types, lo_arg **argv, int argc, lo
 			ret = 0;
 		}
 	}
-	else if (!strncmp (path, X_("/cue/new_aux"), 12)) {
+	else if (!strncmp (path, X_("/cue/new_bus"), 12) || !strncmp (path, X_("/cue/new_aux"), 12)) {
 		// Create new Aux bus
 		string name = "";
 		string dest_1 = "";
@@ -6471,7 +6455,7 @@ OSC::cue_parse (const char *path, const char* types, lo_arg **argv, int argc, lo
 		}
 	}
 	else if (!strncmp (path, X_("/cue/new_send"), 13)) {
-		// Create new send to aux
+		// Create new send to Foldback
 		string rt_name = "";
 		if (argc == 1 && types[0] == 's') {
 			rt_name = &argv[0]->s;
@@ -6480,16 +6464,16 @@ OSC::cue_parse (const char *path, const char* types, lo_arg **argv, int argc, lo
 			PBD::warning << "OSC: new_send has wrong number or type of parameters." << endmsg;
 		}
 	}
-	else if (!strncmp (path, X_("/cue/next_aux"), 13)) {
-		// switch to next Aux bus
+	else if (!strncmp (path, X_("/cue/next_bus"), 13) || !strncmp (path, X_("/cue/next_aux"), 13)) {
+		// switch to next Foldback bus
 		if ((!argc) || argv[0]->f || argv[0]->i) {
 			ret = cue_next (msg);
 		} else {
 			ret = 0;
 		}
 	}
-	else if (!strncmp (path, X_("/cue/previous_aux"), 17)) {
-		// switch to previous Aux bus
+	else if (!strncmp (path, X_("/cue/previous_bus"), 17) || !strncmp (path, X_("/cue/previous_aux"), 17)) {
+		// switch to previous Foldback bus
 		if ((!argc) || argv[0]->f || argv[0]->i) {
 			ret = cue_previous (msg);
 		} else {
