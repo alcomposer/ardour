@@ -410,31 +410,20 @@ PianoRollHeader::on_expose_event (GdkEventExpose* ev)
 PianoRollHeader::midnamName
 PianoRollHeader::get_note_name (int note)
 {
-/*
 	using namespace MIDI::Name;
-    std::string name;
+	std::string name;
 	std::string note_n;
-	midnamName rtn;
+    midnamName rtn;
 
 	MidiTimeAxisView* mtv = dynamic_cast<MidiTimeAxisView*>(&_view.trackview());
 	if (mtv) {
-		boost::shared_ptr<MasterDeviceNames> device_names(mtv->get_device_names());
-		if (device_names) {
-			name = device_names->note_name(mtv->gui_property (X_("midnam-custom-device-mode")),
-			                               stoi(mtv->gui_property (X_("midnam-channel")))-1,
-			                               0,
-			                               0,
-			                               note);
-		}
+		int midnam_channel = stoi(mtv->gui_property (X_("midnam-channel")))-1;
+		name = mtv->_route->instrument_info ().get_note_name (
+		                                    0,               //bank
+		                                    0,               //program
+		                                    midnam_channel,  //channel
+		                                    note);           //note
 	}
-*/
-	using namespace MIDI::Name;
-    std::string note_n;
-    midnamName rtn;
-    boost::shared_ptr<NoteType> dummy_note ( new NoteType);
-
-    std::string name = MidiRegionView::get_note_name(dummy_note, note);
-
 
 	int oct_rel = note % 12;
 	switch(oct_rel) {
