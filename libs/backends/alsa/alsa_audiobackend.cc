@@ -489,7 +489,7 @@ AlsaAudioBackend::update_systemic_midi_latencies ()
 		assert (nfo);
 		LatencyRange lr;
 		lr.min = lr.max = (_measure_latency ? 0 : nfo->systemic_output_latency);
-		set_latency_range (boost::dynamic_pointer_cast<AlsaAudioPort>(*it), true, lr);
+		set_latency_range (*it, true, lr);
 	}
 
 	i = 0;
@@ -756,6 +756,8 @@ AlsaAudioBackend::_start (bool for_latency_measurement)
 		return BackendReinitializationError;
 	}
 
+	_measure_latency = for_latency_measurement;
+
 	clear_ports ();
 
 	/* reset internal state */
@@ -780,10 +782,22 @@ AlsaAudioBackend::_start (bool for_latency_measurement)
 		return AudioDeviceInvalidError;
 	}
 
+	std::string slave_device;
+	AudioSlave::DuplexMode slave_duplex = AudioSlave::FullDuplex;
+
 	if (_input_audio_device != _output_audio_device) {
 		if (_input_audio_device != get_standard_device_name(DeviceNone) && _output_audio_device != get_standard_device_name(DeviceNone)) {
-			PBD::error << _("AlsaAudioBackend: Cannot use two different devices.");
-			return AudioDeviceInvalidError;
+#if 0 /* ideally we'd resample output ...*/
+			slave_device = _output_audio_device;
+			_output_audio_device = get_standard_device_name(DeviceNone);
+			slave_duplex = AudioSlave::HalfDuplexOut;
+#else
+			/*.. but input is usually a cheap USB device, and keeping
+			 * output does auto-connect master-out to the main device. */
+			slave_device = _input_audio_device;
+			_input_audio_device = get_standard_device_name(DeviceNone);
+			slave_duplex = AudioSlave::HalfDuplexIn;
+#endif
 		}
 		if (_input_audio_device != get_standard_device_name(DeviceNone)) {
 			get_alsa_audio_device_names(devices, HalfDuplexIn);
@@ -800,15 +814,14 @@ AlsaAudioBackend::_start (bool for_latency_measurement)
 		duplex = 3;
 	}
 
-	for (std::map<std::string, std::string>::const_iterator i = devices.begin (); i != devices.end(); ++i) {
-		if (i->first == audio_device) {
-			alsa_device = i->second;
-			break;
-		}
-	}
-	if (alsa_device == "") {
+	std::map<std::string, std::string>::const_iterator di = devices.find (audio_device);
+
+	if (di == devices.end ()) {
 		PBD::error << _("AlsaAudioBackend: Cannot find configured device. Is it still connected?");
 		return AudioDeviceNotAvailableError;
+	} else {
+		alsa_device = di->second;
+		assert (!alsa_device.empty());
 	}
 
 	_device_reservation.acquire_device(alsa_device.c_str());
@@ -901,8 +914,6 @@ AlsaAudioBackend::_start (bool for_latency_measurement)
 		PBD::warning << _("AlsaAudioBackend: sample rate does not match.") << endmsg;
 	}
 
-	_measure_latency = for_latency_measurement;
-
 	register_system_midi_ports();
 
 	if (register_system_audio_ports()) {
@@ -954,26 +965,43 @@ AlsaAudioBackend::_start (bool for_latency_measurement)
 
 	_midi_device_thread_active = listen_for_midi_device_changes ();
 
+	if (!slave_device.empty () && (di = devices.find (slave_device)) != devices.end ()) {
+		std::string dev = di->second;
+		if (add_slave (dev.c_str(), _samplerate, _samples_per_period, _periods_per_cycle, slave_duplex)) {
+			PBD::info << string_compose (_("ALSA slave '%1' added"), dev) << endmsg;
+		} else {
+			PBD::error << string_compose (_("ALSA failed to add '%1' as slave"), dev) << endmsg;
+		}
+	}
+
 #if 1 // TODO: we need a GUI (and API) for this
+	/* example: ARDOUR_ALSA_EXT="hw:2@48000/512*3;hw:3@44100" */
 	if (NULL != getenv ("ARDOUR_ALSA_EXT")) {
 		boost::char_separator<char> sep (";");
-		boost::tokenizer<boost::char_separator<char> > devs (std::string(getenv ("ARDOUR_ALSA_EXT")), sep);
+		std::string ext (getenv ("ARDOUR_ALSA_EXT"));
+		boost::tokenizer<boost::char_separator<char> > devs (ext, sep);
 		BOOST_FOREACH (const std::string& tmp, devs) {
 			std::string dev (tmp);
-			std::string::size_type n = dev.find ('@');
 			unsigned int sr = _samplerate;
 			unsigned int spp = _samples_per_period;
-			unsigned int duplex = 3; // TODO parse 1: play, 2: capt, 3:both
+			unsigned int ppc = _periods_per_cycle;
+			AudioSlave::DuplexMode duplex = AudioSlave::FullDuplex;
+			std::string::size_type n = dev.find ('@');
 			if (n != std::string::npos) {
-				std::string opt (dev.substr (n + 1));
+				std::string const opt (dev.substr (n + 1));
 				sr = PBD::atoi (opt);
 				dev = dev.substr (0, n);
 				std::string::size_type n = opt.find ('/');
 				if (n != std::string::npos) {
-					spp = PBD::atoi (opt.substr (n + 1));
+					std::string const opt2 (opt.substr (n + 1));
+					spp = PBD::atoi (opt2);
+					std::string::size_type n = opt2.find ('*');
+					if (n != std::string::npos) {
+						ppc = PBD::atoi (opt2.substr (n + 1));
+					}
 				}
 			}
-			if (add_slave (dev.c_str(), sr, spp, duplex)) {
+			if (add_slave (dev.c_str(), sr, spp, ppc, duplex)) {
 				PBD::info << string_compose (_("ALSA slave '%1' added"), dev) << endmsg;
 			} else {
 				PBD::error << string_compose (_("ALSA failed to add '%1' as slave"), dev) << endmsg;
@@ -1187,7 +1215,7 @@ AlsaAudioBackend::register_system_audio_ports()
 	const uint32_t lcpp = (_periods_per_cycle - 2) * _samples_per_period;
 
 	/* audio ports */
-	lr.min = lr.max = (_systemic_audio_input_latency);
+	lr.min = lr.max = (_measure_latency ? 0 : _systemic_audio_input_latency);
 	for (int i = 1; i <= a_ins; ++i) {
 		char tmp[64];
 		snprintf(tmp, sizeof(tmp), "system:capture_%d", i);
@@ -1199,7 +1227,7 @@ AlsaAudioBackend::register_system_audio_ports()
 		_system_inputs.push_back (ap);
 	}
 
-	lr.min = lr.max = lcpp + (_systemic_audio_output_latency);
+	lr.min = lr.max = lcpp + (_measure_latency ? 0 : _systemic_audio_output_latency);
 	for (int i = 1; i <= a_out; ++i) {
 		char tmp[64];
 		snprintf(tmp, sizeof(tmp), "system:playback_%d", i);
@@ -1465,7 +1493,7 @@ AlsaAudioBackend::register_system_midi_ports(const std::string device)
 					delete mout;
 				} else {
 					LatencyRange lr;
-					lr.min = lr.max = (nfo->systemic_output_latency);
+					lr.min = lr.max = (_measure_latency ? 0 : nfo->systemic_output_latency);
 					set_latency_range (p, true, lr);
 					boost::dynamic_pointer_cast<AlsaMidiPort>(p)->set_n_periods(_periods_per_cycle); // TODO check MIDI alignment
 					BackendPortPtr ap = boost::dynamic_pointer_cast<BackendPort>(p);
@@ -1513,7 +1541,7 @@ AlsaAudioBackend::register_system_midi_ports(const std::string device)
 					continue;
 				}
 				LatencyRange lr;
-				lr.min = lr.max = (nfo->systemic_input_latency);
+				lr.min = lr.max = (_measure_latency ? 0 : nfo->systemic_input_latency);
 				set_latency_range (p, false, lr);
 				BackendPortPtr ap = boost::dynamic_pointer_cast<BackendPort>(p);
 				ap->set_pretty_name (replace_name_io (i->first, true));
@@ -2007,11 +2035,12 @@ bool
 AlsaAudioBackend::add_slave (const char*  device,
                              unsigned int slave_rate,
                              unsigned int slave_spp,
-                             unsigned int duplex)
+                             unsigned int slave_ppc,
+                             AudioSlave::DuplexMode duplex)
 {
 	AudioSlave* s = new AudioSlave (device, duplex,
 			_samplerate, _samples_per_period,
-			slave_rate, slave_spp, 2);
+			slave_rate, slave_spp, slave_ppc);
 
 	if (s->state ()) {
 		// TODO parse error status
@@ -2064,18 +2093,18 @@ errout:
 
 AlsaAudioBackend::AudioSlave::AudioSlave (
 		const char*  device,
-		unsigned int duplex,
+		DuplexMode   duplex,
 		unsigned int master_rate,
 		unsigned int master_samples_per_period,
 		unsigned int slave_rate,
 		unsigned int slave_samples_per_period,
-		unsigned int periods_per_cycle)
+		unsigned int slave_periods_per_cycle)
 	: AlsaDeviceReservation (device)
 	, AlsaAudioSlave (
-			(duplex & 1) ? device : NULL /* playback */,
-			(duplex & 2) ? device : NULL /* capture */,
+			(duplex & HalfDuplexOut) ? device : NULL /* playback */,
+			(duplex & HalfDuplexIn)  ? device : NULL /* capture */,
 			master_rate, master_samples_per_period,
-			slave_rate, slave_samples_per_period, periods_per_cycle)
+			slave_rate, slave_samples_per_period, slave_periods_per_cycle)
 	, active (false)
 	, halt (false)
 	, dead (false)

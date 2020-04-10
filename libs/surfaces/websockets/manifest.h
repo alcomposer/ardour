@@ -11,25 +11,36 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License along
+ * You should have received a copy of the/GNU General Public License along
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef _ardour_surface_websockets_globals_h_
-#define _ardour_surface_websockets_globals_h_
+#ifndef _ardour_surface_websockets_manifest_h_
+#define _ardour_surface_websockets_manifest_h_
 
-#include "component.h"
+#include <string>
 
-class ArdourGlobals : public SurfaceComponent
+class SurfaceManifest
 {
 public:
-	ArdourGlobals (ArdourSurface::ArdourWebsockets& surface)
-	    : SurfaceComponent (surface){};
-	virtual ~ArdourGlobals (){};
+	// all ardour control surfaces store presets in xml format
+	SurfaceManifest (std::string);
 
-	double tempo () const;
-	void   set_tempo (double);
+	bool valid () { return _valid; }
+
+	std::string id () { return _id; }
+	std::string name () { return _name; }
+	std::string description () { return _description; }
+
+	std::string to_json ();
+
+private:
+	bool _valid;
+
+	std::string _id;
+	std::string _name;
+	std::string _description;
 };
 
-#endif // _ardour_surface_websockets_globals_h_
+#endif // _ardour_surface_websockets_manifest_h_

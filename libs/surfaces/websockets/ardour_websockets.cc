@@ -35,7 +35,7 @@ using namespace ArdourSurface;
 #include "pbd/abstract_ui.cc" // instantiate template
 
 ArdourWebsockets::ArdourWebsockets (Session& s)
-    : ControlProtocol (s, X_ (SURFACE_NAME))
+    : ControlProtocol (s, X_ (surface_name))
     , AbstractUI<ArdourWebsocketsUIRequest> (name ())
     , _strips (*this)
     , _globals (*this)
@@ -112,6 +112,7 @@ ArdourWebsockets::start ()
 	     it != _components.end (); ++it) {
 		int rc = (*it)->start ();
 		if (rc != 0) {
+			BaseUI::quit ();
 			return -1;
 		}
 	}

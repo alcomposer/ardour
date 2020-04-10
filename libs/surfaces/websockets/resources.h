@@ -11,25 +11,42 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License along
+ * You should have received a copy of the/GNU General Public License along
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef _ardour_surface_websockets_globals_h_
-#define _ardour_surface_websockets_globals_h_
+#ifndef _ardour_surface_websockets_resources_h_
+#define _ardour_surface_websockets_resources_h_
 
-#include "component.h"
+#include <string>
+#include <vector>
 
-class ArdourGlobals : public SurfaceComponent
+#include "manifest.h"
+
+typedef std::vector<SurfaceManifest> SurfaceManifestVector;
+
+class ServerResources
 {
 public:
-	ArdourGlobals (ArdourSurface::ArdourWebsockets& surface)
-	    : SurfaceComponent (surface){};
-	virtual ~ArdourGlobals (){};
+	ServerResources ();
 
-	double tempo () const;
-	void   set_tempo (double);
+	const std::string& index_dir ();
+	const std::string& builtin_dir ();
+	const std::string& user_dir ();
+
+	std::string scan ();
+
+private:
+
+	std::string _index_dir;
+	std::string _builtin_dir;
+	std::string _user_dir;
+
+	std::string server_data_dir ();
+
+	SurfaceManifestVector read_manifests (std::string);
+
 };
 
-#endif // _ardour_surface_websockets_globals_h_
+#endif // _ardour_surface_websockets_resources_h_
