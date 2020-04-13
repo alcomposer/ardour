@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Luciano Iam <lucianito@gmail.com>
+ * Copyright © 2020 Luciano Iam <lucianito@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,20 +18,21 @@
 
 const JSON_INF = 1.0e+128;
 
-class Connection {
+export class ArdourMessageChannel {
 
-    // https://developer.mozilla.org/en-US/docs/Web/API/URL/host
-    
     constructor (host) {
-        this.socket = new WebSocket(`ws://${host}`);
-        this.socket.onopen = () => this.openCallback();
-        this.socket.onclose = () => this.closeCallback();
-        this.socket.onerror = (error) => this.errorCallback(error);
-        this.socket.onmessage = (event) => this._onMessage(event);
+        // https://developer.mozilla.org/en-US/docs/Web/API/URL/host
+        this.host = host;
     }
-    
-    openCallback () {
-        // empty
+
+    open () {
+        return new Promise((resolve, reject) => {
+            this.socket = new WebSocket(`ws://${this.host}`);
+            this.socket.onclose = () => this.closeCallback();
+            this.socket.onerror = (error) => this.errorCallback(error);
+            this.socket.onmessage = (event) => this._onMessage(event);
+            this.socket.onopen = resolve;
+        });
     }
 
     closeCallback () {

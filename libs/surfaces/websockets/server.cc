@@ -389,17 +389,23 @@ WebsocketsServer::send_index_body (Client wsi)
 	std::string index = _resources.scan ();
 
 	char body[MAX_INDEX_SIZE];
-	//lws_strncpy (body, index.c_str (), sizeof(body));
+#if LWS_LIBRARY_VERSION_MAJOR >= 3
+	lws_strncpy (body, index.c_str (), sizeof(body));
+#else
 	memset (body, 0, sizeof (body));
 	strncpy (body, index.c_str (), sizeof(body) - 1);
+#endif
 	int len = strlen (body);
 
+	/* lws_write() expects a writable buffer */
 	if (lws_write (wsi, reinterpret_cast<unsigned char*> (body), len, LWS_WRITE_HTTP) != len) {
 		return 1;
 	}
 
-	if (lws_http_transaction_completed (wsi)) {
-		return 1;
+	/* lws_http_transaction_completed() returns 1 if the HTTP connection must close now
+	   Returns 0 and resets connection to wait for new HTTP header / transaction if possible */
+	if (lws_http_transaction_completed (wsi) != 1) {
+		return -1;
 	}
 
 	return -1;	// end connection
