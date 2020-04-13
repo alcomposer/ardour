@@ -16,7 +16,12 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-import { ArdourMessageChannel } from '/shared/channel.js';
+ // This example does not call the API methods in ardour.js,
+ // instead it interacts at a lower level by coupling the widgets
+ // tightly to the message stream
+
+import { ANode, Message } from '/shared/message.js';
+import { Ardour } from '/shared/ardour.js';
 
 import { Switch, DiscreteSlider, ContinuousSlider, LogarithmicSlider,
         StripPanSlider, StripGainSlider, StripMeter } from './widget.js';
@@ -24,40 +29,43 @@ import { Switch, DiscreteSlider, ContinuousSlider, LogarithmicSlider,
 (() => {
 
     const MAX_LOG_LINES = 1000;
-    const FEEDBACK_NODES = ['strip_gain', 'strip_pan', 'strip_meter', 'strip_plugin_enable',
-        'strip_plugin_param_value'];
+    const FEEDBACK_NODES = [ANode.STRIP_GAIN, ANode.STRIP_PAN, ANode.STRIP_METER,
+                            ANode.STRIP_PLUGIN_ENABLE, ANode.STRIP_PLUGIN_PARAM_VALUE];
     
-    const channel = new ArdourMessageChannel(location.host);
+    const ardour = new Ardour(location.host);
     const widgets = {};
 
     main();
 
     function main () {
-        channel.messageCallback = (node, addr, val) => {
-            log(`↙ ${node} (${addr}) = ${val}`, 'message-in');
+        ardour.getSurfaceManifest().then((manifest) => {
+            const div = document.getElementById('manifest');
+            div.innerHTML = `${manifest.name} v${manifest.version}`;
+        });
 
-            if (node == 'strip_desc') {
-                createStrip (addr, ...val);
-            } else if (node == 'strip_plugin_desc') {
-                createStripPlugin (addr, ...val);
-            } else if (node == 'strip_plugin_param_desc') {
-                createStripPluginParam (addr, ...val);
-            } else if (FEEDBACK_NODES.includes(node)) {
-                if (widgets[[node, addr]]) {
-                    widgets[[node, addr]].value = val[0];
+        ardour.addCallback({
+            onMessage: (msg) => {
+                log(`↙ ${msg}`, 'message-in');
+
+                if (msg.node == ANode.STRIP_DESC) {
+                    createStrip (msg.addr, ...msg.val);
+                } else if (msg.node == ANode.STRIP_PLUGIN_DESC) {
+                    createStripPlugin (msg.addr, ...msg.val);
+                } else if (msg.node == ANode.STRIP_PLUGIN_PARAM_DESC) {
+                    createStripPluginParam (msg.addr, ...msg.val);
+                } else if (FEEDBACK_NODES.includes(msg.node)) {
+                    if (widgets[msg.hash]) {
+                        widgets[msg.hash].value = msg.val[0];
+                    }
                 }
+            },
+
+            onError: () => {
+                log('Client error', 'error');
             }
-        };
-
-        channel.closeCallback = () => {
-            log('Connection dropped', 'error');
-        };
-
-        channel.errorCallback = () => {
-            log('Connection error', 'error');
-        };
-
-        channel.open();
+        });
+        
+        ardour.open();
     }
 
     function createStrip (addr, name) {
@@ -127,9 +135,9 @@ import { Switch, DiscreteSlider, ContinuousSlider, LogarithmicSlider,
     }
 
     function send (widget) {
-        const val = widget.value;
-        log(`↗ ${widget.node} (${widget.addr}) = ${val}`, 'message-out');
-        channel.send(widget.node, widget.addr, [val]);
+        const msg = new Message(widget.node, widget.addr, [widget.value]);
+        log(`↗ ${msg}`, 'message-out');
+        ardour.send(msg);
     }
 
     function createElem (html, parent) {

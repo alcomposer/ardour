@@ -16,63 +16,45 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-const JSON_INF = 1.0e+128;
+import { ANode, Message } from './message.js';
 
-export class ArdourMessageChannel {
+export class MessageChannel {
 
-    constructor (host) {
-        // https://developer.mozilla.org/en-US/docs/Web/API/URL/host
-        this.host = host;
-    }
+	constructor (host) {
+		// https://developer.mozilla.org/en-US/docs/Web/API/URL/host
+		this._host = host;
+	}
 
-    open () {
-        return new Promise((resolve, reject) => {
-            this.socket = new WebSocket(`ws://${this.host}`);
-            this.socket.onclose = () => this.closeCallback();
-            this.socket.onerror = (error) => this.errorCallback(error);
-            this.socket.onmessage = (event) => this._onMessage(event);
-            this.socket.onopen = resolve;
-        });
-    }
+	async open () {
+		return new Promise((resolve, reject) => {
+			this._socket = new WebSocket(`ws://${this._host}`);
 
-    closeCallback () {
-        // empty
-    }
-    
-    errorCallback (error) {
-        // empty
-    }
+			this._socket.onclose = () => this.onClose();
 
-    messageCallback (node, addr, val) {
-        // empty
-    }
+			this._socket.onerror = (error) => this.onError(error);
 
-    send (node, addr, val) {
-        for (const i in val) {
-            if (val[i] == Infinity) {
-                val[i] = JSON_INF;
-            } else if (val[i] == -Infinity) {
-                val[i] = -JSON_INF;
-            }
-        }
-        
-        const json = JSON.stringify({node: node, addr: addr, val: val});
+			this._socket.onmessage = (event) => {
+				this.onMessage (Message.fromJsonText(event.data));
+			};
 
-        this.socket.send(json);
-    }
+			this._socket.onopen = resolve;
+		});
+	}
 
-    _onMessage (event) {
-        const msg = JSON.parse(event.data);
+	close () {
+		this._socket.close();
+	}
 
-        for (const i in msg.val) {
-            if (msg.val[i] >= JSON_INF) {
-                msg.val[i] = Infinity;
-            } else if (msg.val[i] <= -JSON_INF) {
-                msg.val[i] = -Infinity;
-            }
-        }
+	send (msg) {
+		if (this._socket) {
+			this._socket.send(msg.toJsonText());
+		} else {
+			throw Error('MessageChannel: cannot call send() before open()');
+		}
+	}
 
-        this.messageCallback(msg.node, msg.addr || [], msg.val);
-    }
+	onClose () {}
+	onError (error) {}
+	onMessage (msg) {}
 
 }

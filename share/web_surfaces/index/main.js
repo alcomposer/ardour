@@ -22,39 +22,44 @@ import { Ardour } from '/shared/ardour.js';
 
     async function main () {
         try {
-            const index = await new Ardour().getAvailableSurfaces();
-            printIndex(index);
+            const surfaces = await new Ardour().getAvailableSurfaces();
+            printSurfaces(surfaces);
         } catch (err) {
-            printError(`Error loading index: ${err.message}`);
+            printError(`Error loading surfaces list: ${err.message}`);
         }
 
         document.getElementById('loading').style.display = 'none';
     }
 
-    function printIndex (index) {
-        for (const group of index) {
-            const surfaces = group.surfaces;
-            const groupPath = group['path'];
-            const groupPathSpan = document.querySelector(`#${groupPath} span`);
+    function printSurfaces (surfaces) {
+        for (const group of surfaces) {
+            const ul = document.querySelector(`#${group.path} > ul`);
             
-            groupPathSpan.innerHTML = group['diskPath'];
+            const li = document.createElement('li');
+            li.innerHTML = `<li>
+                <span>Filesystem location:</span>
+                &thinsp;
+                <span class="filesystem-path">${group.filesystemPath}</span>
+            </li>`;
+            ul.appendChild(li);
 
-            if (surfaces.length > 0) {
-                const ul = document.querySelector(`#${groupPath} > ul`);
-                surfaces.sort((a, b) => a.name.localeCompare(b.name));
-                
-                for (const surface of surfaces) {
+            if (group.surfaces.length > 0) {
+                group.surfaces.sort((a, b) => a.name.localeCompare(b.name));
+
+                for (const surface of group.surfaces) {
                     const li = document.createElement('li');
                     li.innerHTML = `<li>
-                        <a href="${groupPath}/${surface.path}/">${surface.name}</a>
+                        <a href="${group.path}/${surface.path}/">${surface.name}</a>
+                        &thinsp;
+                        <span class="surface-version">(${surface.version})</span>
                         <p>${surface.description}</p>
                     </li>`;
                     ul.appendChild(li);
                 }
             } else {
-                const p = document.createElement('p');
-                p.innerHTML = '<p>No surfaces found</p>';
-                document.getElementById(groupPath).appendChild(p);
+                const li = document.createElement('li');
+                li.innerHTML = 'No surfaces found';
+                ul.appendChild(li);
             }
         }
 

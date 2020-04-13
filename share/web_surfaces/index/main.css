@@ -80,8 +80,13 @@ h2 {
 	margin: 4ex 0;
 }
 
-.disk-path {
+.surface-version {
+	color: #337ab7;
+	font-size: 0.75em;
+}
+
+.filesystem-path {
 	font-family: Monaco, monospace;
-	font-size: 0.66em;
-	color: #bbb;
+	font-size: 0.9em;
+	color: #444;
 }

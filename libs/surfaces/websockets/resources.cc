@@ -80,11 +80,11 @@ ServerResources::scan ()
 {
 	std::stringstream ss;
 
-	std::string builtin_dir_str   = builtin_dir ();
+	std::string builtin_dir_str   = PBD::canonical_path (builtin_dir ());
 	SurfaceManifestVector builtin = read_manifests (builtin_dir_str);
 
 	ss << "[{"
-		<< "\"diskPath\":\"" << builtin_dir_str << "\""
+		<< "\"filesystemPath\":\"" << builtin_dir_str << "\""
 		<< ",\"path\":\"" << builtin_dir_name << "\""
 		<< ",\"surfaces\":"
 		<< "[";
@@ -96,11 +96,11 @@ ServerResources::scan ()
 		}
 	}
 
-	std::string user_dir_str   = user_dir ();
+	std::string user_dir_str   = PBD::canonical_path (user_dir ());
 	SurfaceManifestVector user = read_manifests (user_dir_str);
 
 	ss << "]},{" 
-		<< "\"diskPath\":\"" << user_dir_str << "\""
+		<< "\"filesystemPath\":\"" << user_dir_str << "\""
 		<< ",\"path\":\"" << user_dir_name << "\"" 
 		<< ",\"surfaces\":" 
 		<< "[";
@@ -125,7 +125,7 @@ ServerResources::server_data_dir ()
 	bool defined = false;
 	std::string env_dir (Glib::getenv (data_dir_env_var, defined));
 
-	if (defined) {
+	if (defined && !env_dir.empty ()) {
 		/* useful for development */
 		data_dir = env_dir;
 	} else {

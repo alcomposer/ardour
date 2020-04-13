@@ -27,10 +27,17 @@ div {
     box-shadow: 0px 0px 10px #000;
 }
 
+#manifest {
+    padding: 0.25em 0.5em;
+    opacity: 0.5;
+    background: rgba(0,0,0,0.4);
+}
+
 #log {
     height: 6em;
     overflow: scroll;
     overflow-x: hidden;
+    background: rgba(0,0,0,0.4);
 }
 
 #log pre {
@@ -75,7 +82,6 @@ div {
     margin: 5%;
     padding: 2.5% 5%;
     background: rgba(0,0,0,0.05);
-    border: solid 1px rgba(255,255,255,0.1);
     border-radius: 5px;
 }
 
