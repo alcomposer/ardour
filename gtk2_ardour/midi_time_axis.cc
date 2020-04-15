@@ -131,7 +131,6 @@ MidiTimeAxisView::MidiTimeAxisView (PublicEditor& ed, Session* sess, ArdourCanva
 	, _channel_selector (0)
 	, _step_edit_item (0)
 	, controller_menu (0)
-	, poly_pressure_menu (0)
 	, _step_editor (0)
 {
 	_midnam_model_selector.disable_scrolling();
@@ -160,9 +159,9 @@ MidiTimeAxisView::set_route (boost::shared_ptr<Route> rt)
 	}
 
 	/* This next call will result in our height being set up, so it must come after
-	   the creation of the piano roll / range scroomer as their visibility is set up
-	   when our height is.
-	*/
+	 * the creation of the piano roll / range scroomer as their visibility is set up
+	 * when our height is.
+	 */
 	RouteTimeAxisView::set_route (rt);
 
 	_view->apply_color (ARDOUR_UI_UTILS::gdk_color_to_rgba (color()), StreamView::RegionColor);
@@ -216,9 +215,9 @@ MidiTimeAxisView::set_route (boost::shared_ptr<Route> rt)
 			sigc::mem_fun (*this, &MidiTimeAxisView::toggle_note_selection));
 
 		/* Put the scroomer and the keyboard in a VBox with a padding
-		   label so that they can be reduced in height for stacked-view
-		   tracks.
-		*/
+		 * label so that they can be reduced in height for stacked-view
+		 * tracks.
+		 */
 
 		HSeparator* separator = manage (new HSeparator());
 		separator->set_name("TrackSeparator");
@@ -372,7 +371,23 @@ MidiTimeAxisView::processors_changed (RouteProcessorChange c)
 void
 MidiTimeAxisView::use_midnam_info ()
 {
+	/* Rebuild controller menu */
+	_controller_menu_map.clear ();
+	delete controller_menu;
+	controller_menu = 0;
+
 	setup_midnam_patches ();
+
+	/* update names on any automation lane with MIDNAM names */
+	for (AutomationTracks::iterator i = _automation_tracks.begin(); i != _automation_tracks.end(); ++i) {
+		switch (i->first.type()) {
+			case MidiCCAutomation:
+				i->second->update_name_from_param ();
+				break;
+			default:
+				continue;
+		}
+	}
 }
 
 void
@@ -544,7 +559,6 @@ MidiTimeAxisView::model_changed (const std::string& m)
 	_controller_menu_map.clear ();
 	delete controller_menu;
 	controller_menu = 0;
-	build_automation_action_menu (false);
 
 	if (patch_change_dialog ()) {
 		patch_change_dialog ()->refresh ();
@@ -596,10 +610,10 @@ MidiTimeAxisView::set_height (uint32_t h, TrackHeightMode m)
 	}
 
 	/* We need to do this after changing visibility of our stuff, as it will
-	   eventually trigger a call to Editor::reset_controls_layout_width(),
-	   which needs to know if we have just shown or hidden a scroomer /
-	   piano roll.
-	*/
+	 * eventually trigger a call to Editor::reset_controls_layout_width(),
+	 * which needs to know if we have just shown or hidden a scroomer /
+	 * piano roll.
+	 */
 	RouteTimeAxisView::set_height (h, m);
 }
 
@@ -662,11 +676,11 @@ MidiTimeAxisView::build_automation_action_menu (bool for_selection)
 	using namespace Menu_Helpers;
 
 	/* If we have a controller menu, we need to detach it before
-	   RouteTimeAxis::build_automation_action_menu destroys the
-	   menu it is attached to.  Otherwise GTK destroys
-	   controller_menu's gobj, meaning that it can't be reattached
-	   below.  See bug #3134.
-	*/
+	 * RouteTimeAxis::build_automation_action_menu destroys the
+	 * menu it is attached to.  Otherwise GTK destroys
+	 * controller_menu's gobj, meaning that it can't be reattached
+	 * below.  See bug #3134.
+	 */
 
 	if (controller_menu) {
 		detach_menu (*controller_menu);
@@ -679,44 +693,34 @@ MidiTimeAxisView::build_automation_action_menu (bool for_selection)
 
 	uint16_t selected_channels = midi_track()->get_playback_channel_mask();
 
-	if (selected_channels !=  0) {
+	if (selected_channels != 0) {
 
 		automation_items.push_back (SeparatorElem());
 
 		/* these 2 MIDI "command" types are semantically more like automation
-		   than note data, but they are not MIDI controllers. We give them
-		   special status in this menu, since they will not show up in the
-		   controller list and anyone who actually knows something about MIDI
-		   (!) would not expect to find them there.
-		*/
+		 * than note data, but they are not MIDI controllers. We give them
+		 * special status in this menu, since they will not show up in the
+		 * controller list and anyone who actually knows something about MIDI
+		 * (!) would not expect to find them there.
+		 */
 
-		add_channel_command_menu_item (
-			automation_items, _("Bender"), MidiPitchBenderAutomation, 0);
-		automation_items.back().set_sensitive (
-			!for_selection || _editor.get_selection().tracks.size() == 1);
-		add_channel_command_menu_item (
-			automation_items, _("Pressure"), MidiChannelPressureAutomation, 0);
-		automation_items.back().set_sensitive (
-			!for_selection || _editor.get_selection().tracks.size() == 1);
+		add_channel_command_menu_item (automation_items, _("Bender"), MidiPitchBenderAutomation, 0);
+		automation_items.back().set_sensitive (!for_selection || _editor.get_selection().tracks.size() == 1);
+
+		add_channel_command_menu_item (automation_items, _("Pressure"), MidiChannelPressureAutomation, 0);
+		automation_items.back().set_sensitive (!for_selection || _editor.get_selection().tracks.size() == 1);
 
 		/* now all MIDI controllers. Always offer the possibility that we will
-		   rebuild the controllers menu since it might need to be updated after
-		   a channel mode change or other change. Also detach it first in case
-		   it has been used anywhere else.
-		*/
-
+		 * rebuild the controllers menu since it might need to be updated after
+		 * a channel mode change or other change. Also detach it first in case
+		 * it has been used anywhere else.
+		 */
 		build_controller_menu ();
-
 		automation_items.push_back (MenuElem (_("Controllers"), *controller_menu));
 
-		if (!poly_pressure_menu) {
-			poly_pressure_menu = new Gtk::Menu;
-		}
+		add_channel_command_menu_item (automation_items, _("Polyphonic Pressure"), MidiNotePressureAutomation, 0);
+		automation_items.back().set_sensitive (!for_selection || _editor.get_selection().tracks.size() == 1);
 
-		automation_items.push_back (MenuElem  (_("Polyphonic Pressure"), *poly_pressure_menu));
-
-		automation_items.back().set_sensitive (
-			!for_selection || _editor.get_selection().tracks.size() == 1);
 	} else {
 		automation_items.push_back (
 			MenuElem (string_compose ("<i>%1</i>", _("No MIDI Channels selected"))));
@@ -751,7 +755,7 @@ MidiTimeAxisView::add_channel_command_menu_item (Menu_Helpers::MenuList& items,
 	using namespace Menu_Helpers;
 
 	/* count the number of selected channels because we will build a different menu
-	   structure if there is more than 1 selected.
+	 * structure if there is more than 1 selected.
 	 */
 
 	const uint16_t selected_channels = midi_track()->get_playback_channel_mask();
@@ -891,12 +895,11 @@ MidiTimeAxisView::add_single_channel_controller_item(Menu_Helpers::MenuList& ctl
 /** Add a submenu with 1 item per channel for a controller on many channels. */
 void
 MidiTimeAxisView::add_multi_channel_controller_item(Menu_Helpers::MenuList& ctl_items,
+                                                    const uint16_t          channels,
                                                     int                     ctl,
                                                     const std::string&      name)
 {
 	using namespace Menu_Helpers;
-
-	const uint16_t selected_channels = midi_track()->get_playback_channel_mask();
 
 	Menu* chn_menu = manage (new Menu);
 	MenuList& chn_items (chn_menu->items());
@@ -914,7 +917,7 @@ MidiTimeAxisView::add_multi_channel_controller_item(Menu_Helpers::MenuList& ctl_
 		                      true, param_without_channel)));
 
 	for (uint8_t chn = 0; chn < 16; chn++) {
-		if (selected_channels & (0x0001 << chn)) {
+		if (channels & (0x0001 << chn)) {
 
 			/* for each selected channel, add a menu item for this controller */
 
@@ -960,30 +963,15 @@ MidiTimeAxisView::build_controller_menu ()
 	MenuList& items (controller_menu->items());
 
 	/* create several "top level" menu items for sets of controllers (16 at a
-	   time), and populate each one with a submenu for each controller+channel
-	   combination covering the currently selected channels for this track
-	*/
-
-	const uint16_t selected_channels = midi_track()->get_playback_channel_mask();
-
-	/* count the number of selected channels because we will build a different menu
-	   structure if there is more than 1 selected.
-	*/
-
-	int chn_cnt = 0;
-	for (uint8_t chn = 0; chn < 16; chn++) {
-		if (selected_channels & (0x0001 << chn)) {
-			if (++chn_cnt > 1) {
-				break;
-			}
-		}
-	}
+	 * time), and populate each one with a submenu for each controller+channel
+	 * combination covering the currently selected channels for this track
+	 */
 
 	size_t total_ctrls = _route->instrument_info().master_controller_count ();
 	if (total_ctrls > 0) {
+		/* Controllers names available in midnam file, generate fancy menu */
 		using namespace MIDI::Name;
 
-		/* Controllers names available in midnam file, generate fancy menu */
 		unsigned n_items  = 0;
 		unsigned n_groups = 0;
 
@@ -993,16 +981,24 @@ MidiTimeAxisView::build_controller_menu ()
 
 		MasterDeviceNames::ControlNameLists const& ctllist (_route->instrument_info().master_device_names ()->controls ());
 
-		bool to_top_level = total_ctrls < 32;
+		bool per_name_list = ctllist.size () > 1;
+		bool to_top_level = total_ctrls < 32 && !per_name_list;
 
-		/* TODO: This is not correct, should look up the currently applicable ControlNameList
-		   and only build a menu for that one. */
+		/* reverse lookup which "ChannelNameSet" has "UsesControlNameList <this list>"
+		 * then check for which channels it is valid "AvailableForChannels"
+		 */
+
 		for (MasterDeviceNames::ControlNameLists::const_iterator l = ctllist.begin(); l != ctllist.end(); ++l) {
+
+			uint16_t channels  = _route->instrument_info().channels_for_control_list (l->first);
+			bool multi_channel = 0 != (channels & (channels - 1));
+
 			boost::shared_ptr<ControlNameList> name_list = l->second;
 			Menu*                              ctl_menu  = NULL;
 
 			for (ControlNameList::Controls::const_iterator c = name_list->controls().begin();
 			     c != name_list->controls().end();) {
+
 				const uint16_t ctl = c->second->number();
 
 				/* Skip bank select controllers since they're handled specially */
@@ -1017,8 +1013,8 @@ MidiTimeAxisView::build_controller_menu ()
 					}
 
 					MenuList& ctl_items (ctl_menu->items());
-					if (chn_cnt > 1) {
-						add_multi_channel_controller_item(ctl_items, ctl, c->second->name());
+					if (multi_channel) {
+						add_multi_channel_controller_item(ctl_items, channels, ctl, c->second->name());
 					} else {
 						add_single_channel_controller_item(ctl_items, ctl, c->second->name());
 					}
@@ -1034,7 +1030,9 @@ MidiTimeAxisView::build_controller_menu ()
 				if (++n_items == 32 || ctl < ctl_start || c == name_list->controls().end()) {
 					/* Submenu has 32 items or we're done, or a new name-list started:
 					 * add it to controller menu and reset */
-					items.push_back (MenuElem (string_compose (_("Controllers %1-%2"), ctl_start, ctl_end), *ctl_menu));
+					items.push_back (MenuElem (string_compose ("%1 %2-%3",
+									(per_name_list ? l->first.c_str() : _("Controllers")),
+									ctl_start, ctl_end), *ctl_menu));
 					ctl_menu = NULL;
 					n_items  = 0;
 					++n_groups;
@@ -1043,6 +1041,22 @@ MidiTimeAxisView::build_controller_menu ()
 		}
 	} else {
 		/* No controllers names, generate generic numeric menu */
+
+		const uint16_t selected_channels = midi_track()->get_playback_channel_mask();
+
+		/* count the number of selected channels because we will build a different menu
+		 * structure if there is more than 1 selected.
+		 */
+
+		int chn_cnt = 0;
+		for (uint8_t chn = 0; chn < 16; chn++) {
+			if (selected_channels & (0x0001 << chn)) {
+				if (++chn_cnt > 1) {
+					break;
+				}
+			}
+		}
+
 		for (int i = 0; i < 127; i += 32) {
 			Menu*     ctl_menu = manage (new Menu);
 			MenuList& ctl_items (ctl_menu->items());
@@ -1055,7 +1069,7 @@ MidiTimeAxisView::build_controller_menu ()
 
 				if (chn_cnt > 1) {
 					add_multi_channel_controller_item(
-						ctl_items, ctl, string_compose(_("Controller %1"), ctl));
+						ctl_items, selected_channels, ctl, string_compose(_("Controller %1"), ctl));
 				} else {
 					add_single_channel_controller_item(
 						ctl_items, ctl, string_compose(_("Controller %1"), ctl));
@@ -1334,6 +1348,9 @@ MidiTimeAxisView::create_automation_child (const Evoral::Parameter& param, bool 
 			             *this,
 			             true,
 			             parent_canvas,
+			             /* this calls MidiTrack::describe_parameter()
+			              * -> instrument_info().get_controller_name()
+			              */
 			             _route->describe_parameter(param)));
 
 		if (_view) {
@@ -1544,9 +1561,8 @@ MidiTimeAxisView::get_per_region_note_selection_region_view (RegionView* rv, lis
 void
 MidiTimeAxisView::set_channel_mode (ChannelMode, uint16_t)
 {
-	/* hide all automation tracks that use the wrong channel(s) and show all those that use
-	   the right ones.
-	*/
+	/* hide all automation tracks that use the wrong channel(s) and show all those thatcw
+	 * use the right ones. */
 
 	const uint16_t selected_channels = midi_track()->get_playback_channel_mask();
 	bool changed = false;
@@ -1565,8 +1581,8 @@ MidiTimeAxisView::set_channel_mode (ChannelMode, uint16_t)
 
 			if ((selected_channels & (0x0001 << chn)) == 0) {
 				/* channel not in use. hiding it will trigger RouteTimeAxisView::automation_track_hidden()
-				   which will cause a redraw. We don't want one per channel, so block that with no_redraw.
-				*/
+				 * which will cause a redraw. We don't want one per channel, so block that with no_redraw.
+				 */
 				changed = track->set_marked_for_display (false) || changed;
 			} else {
 				changed = track->set_marked_for_display (true) || changed;
@@ -1676,8 +1692,8 @@ MidiTimeAxisView::get_channel_for_add () const
 	uint8_t channel = 0;
 
 	/* pick the highest selected channel, unless all channels are selected,
-	   which is interpreted to mean channel 1 (zero)
-	*/
+	 * which is interpreted to mean channel 1 (zero)
+	 */
 
 	for (uint16_t i = 0; i < 16; ++i) {
 		if (chn_mask & (1<<i)) {

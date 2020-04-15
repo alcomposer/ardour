@@ -178,8 +178,7 @@ AutomationTimeAxisView::AutomationTimeAxisView (
 	auto_dropdown.AddMenuElem (MenuElem (_("Play"), sigc::bind (sigc::mem_fun(*this,
 						&AutomationTimeAxisView::set_automation_state), (AutoState) Play)));
 
-	if (!(_parameter.type() >= MidiCCAutomation &&
-	      _parameter.type() <= MidiChannelPressureAutomation)) {
+	if (!parameter_is_midi(_parameter.type ())) {
 		auto_dropdown.AddMenuElem (MenuElem (_("Write"), sigc::bind (sigc::mem_fun(*this, &AutomationTimeAxisView::set_automation_state), (AutoState) Write)));
 		auto_dropdown.AddMenuElem (MenuElem (_("Touch"), sigc::bind (sigc::mem_fun(*this, &AutomationTimeAxisView::set_automation_state), (AutoState) Touch)));
 		auto_dropdown.AddMenuElem (MenuElem (_("Latch"), sigc::bind (sigc::mem_fun(*this, &AutomationTimeAxisView::set_automation_state), (AutoState) Latch)));
@@ -575,6 +574,22 @@ AutomationTimeAxisView::set_height (uint32_t h, TrackHeightMode m)
 }
 
 void
+AutomationTimeAxisView::update_name_from_param ()
+{
+	/* Note that this is intended for MidiTrack::describe_parameter()
+	 * -> instrument_info().get_controller_name()
+	 * It does not work with  parent/plug_name for plugins.
+	 */
+	boost::shared_ptr<ARDOUR::Route> r = boost::dynamic_pointer_cast<ARDOUR::Route> (_stripable);
+	if (!r) {
+		return;
+	}
+	_name = r->describe_parameter(_parameter);
+	set_tooltip (controls_ebox, _name);
+	name_label.set_text (_name);
+}
+
+void
 AutomationTimeAxisView::set_samples_per_pixel (double fpp)
 {
 	TimeAxisView::set_samples_per_pixel (fpp);
@@ -603,7 +618,7 @@ AutomationTimeAxisView::hide_clicked ()
 string
 AutomationTimeAxisView::automation_state_off_string () const
 {
-	if (_parameter.type() >= MidiCCAutomation && _parameter.type() <= MidiChannelPressureAutomation) {
+	if (parameter_is_midi(_parameter.type ())) {
 		return S_("Automation|Off");
 	}
 
@@ -644,8 +659,7 @@ AutomationTimeAxisView::build_display_menu ()
 			(AutoState) Play)));
 	auto_play_item = dynamic_cast<Gtk::CheckMenuItem*>(&as_items.back());
 
-	if (!(_parameter.type() >= MidiCCAutomation &&
-	      _parameter.type() <= MidiChannelPressureAutomation)) {
+	if (!parameter_is_midi(_parameter.type ())) {
 		as_items.push_back (CheckMenuElem (_("Write"), sigc::bind (
 			                                   sigc::mem_fun(*this, &AutomationTimeAxisView::set_automation_state),
 			                                   (AutoState) Write)));
@@ -954,11 +968,7 @@ AutomationTimeAxisView::propagate_time_selection () const
 	/* MIDI automation is part of the MIDI region. It is always
 	 * implicily selected with the parent, regardless of TAV selection
 	 */
-	if (_parameter.type() >= MidiCCAutomation &&
-	    _parameter.type() <= MidiChannelPressureAutomation) {
-		return true;
-	}
-	return false;
+	return parameter_is_midi(_parameter.type ());
 }
 
 void
