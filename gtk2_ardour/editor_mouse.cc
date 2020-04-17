@@ -274,7 +274,9 @@ Editor::set_mouse_mode (MouseMode m, bool force)
 	}
 
 	if (ARDOUR::Profile->get_mixbus()) {
-		if (m == MouseAudition) m = MouseRange;
+		if (m == MouseAudition) {
+			m = MouseRange;
+		}
 	}
 
 	Glib::RefPtr<Action>       act  = get_mouse_mode_action(m);
@@ -291,7 +293,9 @@ void
 Editor::mouse_mode_toggled (MouseMode m)
 {
 	if (ARDOUR::Profile->get_mixbus()) {
-		if (m == MouseAudition)  m = MouseRange;
+		if (m == MouseAudition)  {
+			m = MouseRange;
+		}
 	}
 
 	Glib::RefPtr<Action>       act  = get_mouse_mode_action(m);
@@ -342,6 +346,38 @@ Editor::mouse_mode_toggled (MouseMode m)
 	set_gain_envelope_visibility ();
 
 	update_time_selection_display ();
+
+	if (internal_editing()) {
+
+		/* reinstate any existing MIDI note (and by extension, MIDI
+		 * region) selection for internal edit mode. This allows a user
+		 * to enter/exit/enter this mode without losing a selection of
+		 * notes.
+		 */
+
+		catch_up_on_midi_selection ();
+
+		/* ensure that the track canvas has focus, so that key events
+		   will get directed to the correct place.
+		*/
+		_track_canvas->grab_focus ();
+
+		/* enable MIDI editing actions, which in turns enables their
+		   bindings
+		*/
+		ActionManager::set_sensitive (_midi_actions, true);
+
+		/* mark "magic widget focus" so that we handle key events
+		 * correctly
+		 */
+		Keyboard::magic_widget_grab_focus ();
+	} else {
+		/* undo some of the above actions, since we're not in internal
+		   edit mode.
+		*/
+		ActionManager::set_sensitive (_midi_actions, false);
+		Keyboard::magic_widget_drop_focus ();
+	}
 
 	update_all_enter_cursors ();
 
@@ -2623,6 +2659,9 @@ Editor::escape ()
 	if (_drags->active ()) {
 		_drags->abort ();
 	} else if (_session) {
+
+		midi_action (&MidiRegionView::clear_note_selection);
+
 		selection->clear ();
 
 		/* if session is playing a range, cancel that */

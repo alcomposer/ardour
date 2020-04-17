@@ -1209,6 +1209,7 @@ private:
 
 	void register_actions ();
 	void register_region_actions ();
+	void register_midi_actions (Gtkmm2ext::Bindings*);
 
 	void load_bindings ();
 
@@ -1882,6 +1883,7 @@ private:
 	void update_time_selection_display ();
 	void presentation_info_changed (PBD::PropertyChange const &);
 	void region_selection_changed ();
+	void catch_up_on_midi_selection ();
 	sigc::connection editor_regions_selection_changed_connection;
 	void sensitize_all_region_actions (bool);
 	void sensitize_the_right_region_actions (bool because_canvas_crossing);
@@ -2324,6 +2326,9 @@ private:
 
 	QuantizeDialog* quantize_dialog;
 	MainMenuDisabler* _main_menu_disabler;
+
+	/* MIDI actions, proxied to selected MidiRegionView(s) */
+	void midi_action (void (MidiRegionView::*method)());
 
 	/* private helper functions to help with registering region actions */
 
