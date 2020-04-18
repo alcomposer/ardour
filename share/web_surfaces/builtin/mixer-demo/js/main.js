@@ -17,11 +17,10 @@
  */
 
  // This example does not call the API methods in ardour.js,
- // instead it interacts at a lower level by coupling the widgets
- // tightly to the message stream
+ // instead it couples the widgets directly to the message stream
 
 import { ANode, Message } from '/shared/message.js';
-import { Ardour } from '/shared/ardour.js';
+import { ArdourClient } from '/shared/ardour.js';
 
 import { Switch, DiscreteSlider, ContinuousSlider, LogarithmicSlider,
         StripPanSlider, StripGainSlider, StripMeter } from './widget.js';
@@ -29,10 +28,8 @@ import { Switch, DiscreteSlider, ContinuousSlider, LogarithmicSlider,
 (() => {
 
     const MAX_LOG_LINES = 1000;
-    const FEEDBACK_NODES = [ANode.STRIP_GAIN, ANode.STRIP_PAN, ANode.STRIP_METER,
-                            ANode.STRIP_PLUGIN_ENABLE, ANode.STRIP_PLUGIN_PARAM_VALUE];
     
-    const ardour = new Ardour(location.host);
+    const ardour = new ArdourClient(location.host);
     const widgets = {};
 
     main();
@@ -40,104 +37,98 @@ import { Switch, DiscreteSlider, ContinuousSlider, LogarithmicSlider,
     function main () {
         ardour.getSurfaceManifest().then((manifest) => {
             const div = document.getElementById('manifest');
-            div.innerHTML = `${manifest.name} v${manifest.version}`;
+            div.innerHTML = `${manifest.name.toUpperCase()} v${manifest.version} — ${manifest.description}`;
         });
 
-        ardour.addCallback({
-            onMessage: (msg) => {
-                log(`↙ ${msg}`, 'message-in');
-
-                if (msg.node == ANode.STRIP_DESC) {
-                    createStrip (msg.addr, ...msg.val);
-                } else if (msg.node == ANode.STRIP_PLUGIN_DESC) {
-                    createStripPlugin (msg.addr, ...msg.val);
-                } else if (msg.node == ANode.STRIP_PLUGIN_PARAM_DESC) {
-                    createStripPluginParam (msg.addr, ...msg.val);
-                } else if (FEEDBACK_NODES.includes(msg.node)) {
-                    if (widgets[msg.hash]) {
-                        widgets[msg.hash].value = msg.val[0];
-                    }
-                }
-            },
-
-            onError: () => {
-                log('Client error', 'error');
-            }
+        ardour.addCallbacks({
+            onConnected: (error) => { log('Client connected', 'info'); },
+            onDisconnected: (error) => { log('Client disconnected', 'error'); },
+            onMessage: processMessage,
+            onStripDesc: createStrip,
+            onStripPluginDesc: createStripPlugin,
+            onStripPluginParamDesc: createStripPluginParam
         });
         
-        ardour.open();
+        ardour.connect();
     }
 
-    function createStrip (addr, name) {
-        const id = `strip-${addr[0]}`;
+    function createStrip (stripId, name) {
+        const domId = `strip-${stripId}`;
+        if (document.getElementById(domId) != null) {
+            return;
+        }
+
         const strips = document.getElementById('strips');
-        const div = createElem(`<div class="strip" id="${id}"></div>`, strips);
-        createElem(`<label class="comp-name" for="${id}">∿&emsp;&emsp;${name}</label>`, div);
+        const div = createElem(`<div class="strip" id="${domId}"></div>`, strips);
+        createElem(`<label class="comp-name" for="${domId}">∿&emsp;&emsp;${name}</label>`, div);
         
         // meter
-        const meter = new StripMeter('strip_meter', addr);
+        const meter = new StripMeter();
         meter.el.classList.add('slider-meter');
-        meter.attach(div);
-        register(meter);
+        meter.appendTo(div);
+        connectWidget(meter, ANode.STRIP_METER, stripId);
 
         // gain
         let holder = createElem(`<div class="strip-slider"></div>`, div); 
         createElem(`<label>Gain</label>`, holder);
-        const gain = new StripGainSlider('strip_gain', addr);
-        gain.attach(holder, (val) => send(gain));
-        register(gain);
+        const gain = new StripGainSlider();
+        gain.appendTo(holder);
+        connectWidget(gain, ANode.STRIP_GAIN, stripId);
 
         // pan
         holder = createElem(`<div class="strip-slider"></div>`, div); 
         createElem(`<label>Pan</label>`, holder);
-        const pan = new StripPanSlider('strip_pan', addr);
-        pan.attach(holder, (val) => send(pan));
-        register(pan);
+        const pan = new StripPanSlider();
+        pan.appendTo(holder);
+        connectWidget(pan, ANode.STRIP_PAN, stripId);
     }
 
-    function createStripPlugin (addr, name) {
-        const strip = document.getElementById(`strip-${addr[0]}`);
-        const id = `plugin-${addr[0]}-${addr[1]}`;
-        const div = createElem(`<div class="plugin" id="${id}"></div>`, strip);
+    function createStripPlugin (stripId, pluginId, name) {
+        const domId = `plugin-${stripId}-${pluginId}`;
+        if (document.getElementById(domId) != null) {
+            return;
+        }
+
+        const strip = document.getElementById(`strip-${stripId}`);
+        const div = createElem(`<div class="plugin" id="${domId}"></div>`, strip);
         createElem(`<label class="comp-name">⨍&emsp;&emsp;${name}</label>`, div);
-        const enable = new Switch('strip_plugin_enable', addr);
+        
+        const enable = new Switch();
         enable.el.classList.add('plugin-enable');
-        enable.attach(div, (val) => send(enable));
-        register(enable);
+        enable.appendTo(div);
+        connectWidget(enable, ANode.STRIP_PLUGIN_ENABLE, stripId, pluginId);
     }
 
-    function createStripPluginParam (addr, name, data_type, min, max, is_log) {
-        let param, clazz;
+    function createStripPluginParam (stripId, pluginId, paramId, name, valueType, min, max, isLog) {
+        const domId = `param-${stripId}-${pluginId}-${paramId}`;
+        if (document.getElementById(domId) != null) {
+            return;
+        }
 
-        if (data_type == 'b') {
-            clazz = 'boolean';
-            param = new Switch('strip_plugin_param_value', addr);
-        } else if (data_type == 'i') {
-            clazz = 'discrete';
-            param = new DiscreteSlider('strip_plugin_param_value', addr, min, max);
-        } else if (data_type == 'd') {
-            clazz = 'continuous';
-            if (is_log) {
-                param = new LogarithmicSlider('strip_plugin_param_value', addr, min, max);
+        let param, cssClass;
+
+        if (valueType == 'b') {
+            cssClass = 'boolean';
+            param = new Switch();
+        } else if (valueType == 'i') {
+            cssClass = 'discrete';
+            param = new DiscreteSlider(min, max);
+        } else if (valueType == 'd') {
+            cssClass = 'continuous';
+            if (isLog) {
+                param = new LogarithmicSlider(min, max);
             } else {
-                param = new ContinuousSlider('strip_plugin_param_value', addr, min, max);
+                param = new ContinuousSlider(min, max);
             }
         }
 
-        const plugin = document.getElementById(`plugin-${addr[0]}-${addr[1]}`);
-        const id = `param-${addr[0]}-${addr[1]}-${addr[2]}`;
-        const div = createElem(`<div class="plugin-param ${clazz}" id="${id}"></div>`, plugin);
-        createElem(`<label for="${id}">${name}</label>`, div);
+        const plugin = document.getElementById(`plugin-${stripId}-${pluginId}`);
+        const div = createElem(`<div class="plugin-param ${cssClass}" id="${domId}"></div>`, plugin);
+        createElem(`<label for="${domId}">${name}</label>`, div);
 
-        param.attach(div, (val) => send(param));
-        param.el.name = id;
-        register(param);
-    }
-
-    function send (widget) {
-        const msg = new Message(widget.node, widget.addr, [widget.value]);
-        log(`↗ ${msg}`, 'message-out');
-        ardour.send(msg);
+        param.el.name = domId;
+        param.appendTo(div);
+        connectWidget(param, ANode.STRIP_PLUGIN_PARAM_VALUE, stripId, pluginId, paramId);
     }
 
     function createElem (html, parent) {
@@ -153,8 +144,24 @@ import { Switch, DiscreteSlider, ContinuousSlider, LogarithmicSlider,
         return elem;
     }
 
-    function register (widget) {
-        widgets[widget.hash] = widget;
+    function connectWidget (widget, node, ...addr) {
+        const nodeAddrId = Message.nodeAddrId(node, addr);
+
+        widgets[nodeAddrId] = widget;
+
+        widget.callback = (val) => {
+            const msg = new Message(node, addr, [val]);
+            log(`↗ ${msg}`, 'message-out');
+            ardour.send(msg);
+        };
+    }
+
+    function processMessage (msg) {
+        log(`↙ ${msg}`, 'message-in');
+
+        if (widgets[msg.nodeAddrId]) {
+            widgets[msg.nodeAddrId].value = msg.val[0];
+        }
     }
 
     function log (message, className) {

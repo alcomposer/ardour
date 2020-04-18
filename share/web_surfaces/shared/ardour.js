@@ -16,13 +16,19 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-import { ANode, Message } from './message.js';
+import { ControlMixin } from './control.js';
+import { MetadataMixin } from './metadata.js';
+import { Message } from './message.js';
 import { MessageChannel } from './channel.js';
 
-export class Ardour {
+// See ControlMixin and MetadataMixin for available APIs
+// See ArdourCallback for an example callback implementation
+
+class BaseArdourClient {
 
 	constructor () {
 		this._callbacks = [];
+		this._connected = false;
 		this._pendingRequest = null;
 		this._channel = new MessageChannel(location.host);
 
@@ -35,111 +41,47 @@ export class Ardour {
 		};
 	}
 
-	addCallback (callback) {
-		this._callbacks.push(callback);
+	addCallbacks (callbacks) {
+		this._callbacks.push(callbacks);
 	}
 
-	async open () {
-		this._channel.onClose = () => {
-			this._fireCallbacks('error', new Error('Message channel unexpectedly closed'));
+	async connect (autoReconnect) {
+		this._channel.onClose = async () => {
+			if (this._connected) {
+				this._fireCallbacks('disconnected');
+				this._connected = false;
+			}
+
+			if ((autoReconnect == null) || autoReconnect) {
+				await this._sleep(1000);
+				await this._connect();
+			}
 		};
 
-		await this._channel.open();
+		this._connect();
 	}
 
-	close () {
+	disconnect () {
 		this._channel.onClose = () => {};
 		this._channel.close();
+		this._connected = false;
 	}
 
 	send (msg) {
 		this._channel.send(msg);
 	}
 
-	// Surface metadata API over HTTP
-
-	async getAvailableSurfaces () {
-		const response = await fetch('/surfaces.json');
-		
-		if (response.status == 200) {
-			return await response.json();
-		} else {
-			throw this._fetchResponseStatusError(response.status);
-		}
-	}
-
-	async getSurfaceManifest () {
-		const response = await fetch('manifest.xml');
-
-		if (response.status == 200) {
-			const xmlText = await response.text();
-			const xmlDoc = new DOMParser().parseFromString(xmlText, 'text/xml');
-			return {
-				name: xmlDoc.getElementsByTagName('Name')[0].getAttribute('value'),
-				description: xmlDoc.getElementsByTagName('Description')[0].getAttribute('value'),
-				version: xmlDoc.getElementsByTagName('Version')[0].getAttribute('value')
-			}
-		} else {
-			throw this._fetchResponseStatusError(response.status);
-		}
-	}
-
-	// Surface control API over WebSockets
-	// clients need to call open() before calling these methods
-
-	async getTempo () {
-		return (await this._sendAndReceive(ANode.TEMPO))[0];
-	}
-	
-	async getStripGain (stripId) {
-		return (await this._sendAndReceive(ANode.STRIP_GAIN, [stripId]))[0];
-	}
-
-	async getStripPan (stripId) {
-		return (await this._sendAndReceive(ANode.STRIP_PAN, [stripId]))[0];
-	}
-
-	async getStripMute (stripId) {
-		return (await this._sendAndReceive(ANode.STRIP_MUTE, [stripId]))[0];
-	}
-
-	async getStripPluginEnable (stripId, pluginId) {
-		return (await this._sendAndReceive(ANode.STRIP_PLUGIN_ENABLE, [stripId, pluginId]))[0];
-	}
-
-	async getStripPluginParamValue (stripId, pluginId, paramId) {
-		return (await this._sendAndReceive(ANode.STRIP_PLUGIN_PARAM_VALUE, [stripId, pluginId, paramId]))[0];
-	}
-
-	setTempo (bpm) {
-		this._send(ANode.TEMPO, [], [bpm]);
-	}
-
-	setStripGain (stripId, db) {
-		this._send(ANode.STRIP_GAIN, [stripId], [db]);
-	}
-
-	setStripPan (stripId, value) {
-		this._send(ANode.STRIP_PAN, [stripId], [value]);
-	}
-
-	setStripMute (stripId, value) {
-		this._send(ANode.STRIP_MUTE, [stripId], [value]);
-	}
-
-	setStripPluginEnable (stripId, pluginId, value) {
-		this._send(ANode.STRIP_PLUGIN_ENABLE, [stripId, pluginId], [value]);
-	}
-
-	setStripPluginParamValue (stripId, pluginId, paramId, value) {
-		this._send(ANode.STRIP_PLUGIN_PARAM_VALUE, [stripId, pluginId, paramId], [value]);
-	}
-
 	// Private methods
+	
+	async _connect () {
+		await this._channel.open();
+		this._connected = true;
+		this._fireCallbacks('connected');
+	}
 
 	_send (node, addr, val) {
 		const msg = new Message(node, addr, val);
-		this._channel.send(msg);
+		this.send(msg);
 		return msg;
 	}
 
@@ -148,6 +90,10 @@ export class Ardour {
 			const hash = this._send(node, addr, val).hash;
 			this._pendingRequest = {resolve: resolve, hash: hash};
 		});
+	}
+
+	async _sendRecvSingle (node, addr, val) {
+		return await this._sendAndReceive (node, addr, val)[0];
 	}
 
 	_onChannelMessage (msg) {
@@ -166,9 +112,9 @@ export class Ardour {
 			return s[0].toUpperCase() + s.slice(1).toLowerCase();
 		}).join('');
 
-		for (const callback of this._callbacks) {
-			if (method in callback) {
-				callback[method](...args)
+		for (const callbacks of this._callbacks) {
+			if (method in callbacks) {
+				callbacks[method](...args)
 			}
 		}
 	}
@@ -177,4 +123,21 @@ export class Ardour {
 		return new Error(`HTTP response status ${status}`);
 	}
 
+	async _sleep (t) {
+		return new Promise(resolve => setTimeout(resolve, 1000));
+	}
+
+}
+
+export class ArdourClient extends mixin(BaseArdourClient, ControlMixin, MetadataMixin) {}
+
+function mixin (dstClass, ...classes) {
+	for (const srcClass of classes) {
+		for (const propName of Object.getOwnPropertyNames(srcClass.prototype)) {
+			if (propName != 'constructor') {
+				dstClass.prototype[propName] = srcClass.prototype[propName];
+			}
+		}
+	}
+	return dstClass;
 }

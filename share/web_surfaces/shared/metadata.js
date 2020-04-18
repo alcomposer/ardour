@@ -16,38 +16,36 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
- // Example empty callback
+// Surface metadata API over HTTP
 
- export class ArdourCallback {
+export class MetadataMixin {
 
-	// Connection status
-	onConnected () {}
-	onDisconnected () {}
+	async getAvailableSurfaces () {
+		const response = await fetch('/surfaces.json');
+		
+		if (response.status == 200) {
+			return await response.json();
+		} else {
+			throw this._fetchResponseStatusError(response.status);
+		}
+	}
 
-	// All messages and errors
- 	onMessage (msg) {}	
- 	onError (error) {}
+	async getSurfaceManifest () {
+		const response = await fetch('manifest.xml');
 
-	// Globals
-	onTempo (bpm) {}
+		if (response.status == 200) {
+			const manifest = {};
+			const xmlText = await response.text();
+			const xmlDoc = new DOMParser().parseFromString(xmlText, 'text/xml');
+			
+			for (const child of xmlDoc.children[0].children) {
+				manifest[child.tagName.toLowerCase()] = child.getAttribute('value');
+			}
 
-	// Strips
-	onStripDesc (stripId, name) {}
-	onStripMeter (stripId, db) {}
-	onStripGain (stripId, db) {}
-	onStripPan (stripId, value) {}
-	onStripMute (stripId, value) {}
-
-	// Strip plugins
-	onStripPluginDesc (stripId, pluginId, name) {}
-	onStripPluginEnable (stripId, pluginId, value) {}
-
-	// Strip plugin parameters
-	// valueType
-	//   'b' : boolean
-	//   'i' : integer
-	//   'd' : double
-	onStripPluginParamDesc (stripId, pluginId, paramId, name, valueType, min, max, isLog) {}
-	onStripPluginParamValue (stripId, pluginId, paramId, value) {}
+			return manifest;
+		} else {
+			throw this._fetchResponseStatusError(response.status);
+		}
+	}
 
 }

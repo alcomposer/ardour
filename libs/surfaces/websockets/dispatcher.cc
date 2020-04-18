@@ -29,13 +29,13 @@ using namespace ARDOUR;
 #define NODE_METHOD_PAIR(x) (Node::x, &WebsocketsDispatcher::x##_handler)
 
 WebsocketsDispatcher::NodeMethodMap
-    WebsocketsDispatcher::_node_to_method = boost::assign::map_list_of
+	WebsocketsDispatcher::_node_to_method = boost::assign::map_list_of
 		NODE_METHOD_PAIR (tempo)
 		NODE_METHOD_PAIR (strip_gain)
-    NODE_METHOD_PAIR (strip_pan)
-    NODE_METHOD_PAIR (strip_mute)
-    NODE_METHOD_PAIR (strip_plugin_enable)
-    NODE_METHOD_PAIR (strip_plugin_param_value);
+		NODE_METHOD_PAIR (strip_pan)
+		NODE_METHOD_PAIR (strip_mute)
+		NODE_METHOD_PAIR (strip_plugin_enable)
+		NODE_METHOD_PAIR (strip_plugin_param_value);
 
 void
 WebsocketsDispatcher::dispatch (Client client, const NodeStateMessage& msg)
@@ -105,7 +105,6 @@ WebsocketsDispatcher::update_all_nodes (Client client)
 					val.push_back (std::string ("i"));
 					val.push_back (pd.lower);
 					val.push_back (pd.upper);
-					val.push_back (pd.integer_step);
 				} else {
 					val.push_back (std::string ("d"));
 					val.push_back (pd.lower);
@@ -125,8 +124,10 @@ WebsocketsDispatcher::update_all_nodes (Client client)
 void
 WebsocketsDispatcher::tempo_handler (Client client, const NodeStateMessage& msg)
 {
-	if (msg.is_write ()) {
-		globals ().set_tempo (msg.state ().nth_val (0));
+	const NodeState& state = msg.state ();
+
+	if (msg.is_write () && (state.n_val () > 0)) {
+		globals ().set_tempo (state.nth_val (0));
 	} else {
 		update (client, Node::tempo, globals ().tempo ());
 	}
@@ -135,10 +136,16 @@ WebsocketsDispatcher::tempo_handler (Client client, const NodeStateMessage& msg)
 void
 WebsocketsDispatcher::strip_gain_handler (Client client, const NodeStateMessage& msg)
 {
-	uint32_t strip_id = msg.state ().nth_addr (0);
+	const NodeState& state = msg.state ();
 
-	if (msg.is_write ()) {
-		strips ().set_strip_gain (strip_id, msg.state ().nth_val (0));
+	if (state.n_addr () < 1) {
+		return;
+	}
+
+	uint32_t strip_id = state.nth_addr (0);
+
+	if (msg.is_write () && (state.n_val () > 0)) {
+		strips ().set_strip_gain (strip_id, state.nth_val (0));
 	} else {
 		update (client, Node::strip_gain, strip_id, strips ().strip_gain (strip_id));
 	}
@@ -147,10 +154,16 @@ WebsocketsDispatcher::strip_gain_handler (Client client, const NodeStateMessage&
 void
 WebsocketsDispatcher::strip_pan_handler (Client client, const NodeStateMessage& msg)
 {
-	uint32_t strip_id = msg.state ().nth_addr (0);
+	const NodeState& state = msg.state ();
 
-	if (msg.is_write ()) {
-		strips ().set_strip_pan (strip_id, msg.state ().nth_val (0));
+	if (state.n_addr () < 1) {
+		return;
+	}
+
+	uint32_t strip_id = state.nth_addr (0);
+
+	if (msg.is_write () && (state.n_val () > 0)) {
+		strips ().set_strip_pan (strip_id, state.nth_val (0));
 	} else {
 		update (client, Node::strip_pan, strip_id, strips ().strip_pan (strip_id));
 	}
@@ -159,10 +172,16 @@ WebsocketsDispatcher::strip_pan_handler (Client client, const NodeStateMessage& 
 void
 WebsocketsDispatcher::strip_mute_handler (Client client, const NodeStateMessage& msg)
 {
-	uint32_t strip_id = msg.state ().nth_addr (0);
+	const NodeState& state = msg.state ();
 
-	if (msg.is_write ()) {
-		strips ().set_strip_mute (strip_id, msg.state ().nth_val (0));
+	if (state.n_addr () < 1) {
+		return;
+	}
+
+	uint32_t strip_id = state.nth_addr (0);
+
+	if (msg.is_write () && (state.n_val () > 0)) {
+		strips ().set_strip_mute (strip_id, state.nth_val (0));
 	} else {
 		update (client, Node::strip_mute, strip_id, strips ().strip_mute (strip_id));
 	}
@@ -171,11 +190,17 @@ WebsocketsDispatcher::strip_mute_handler (Client client, const NodeStateMessage&
 void
 WebsocketsDispatcher::strip_plugin_enable_handler (Client client, const NodeStateMessage& msg)
 {
-	uint32_t strip_id  = msg.state ().nth_addr (0);
-	uint32_t plugin_id = msg.state ().nth_addr (1);
+	const NodeState& state = msg.state ();
 
-	if (msg.is_write ()) {
-		strips ().set_strip_plugin_enabled (strip_id, plugin_id, msg.state ().nth_val (0));
+	if (state.n_addr () < 2) {
+		return;
+	}
+
+	uint32_t strip_id  = state.nth_addr (0);
+	uint32_t plugin_id = state.nth_addr (1);
+
+	if (msg.is_write () && (state.n_val () > 0)) {
+		strips ().set_strip_plugin_enabled (strip_id, plugin_id, state.nth_val (0));
 	} else {
 		update (client, Node::strip_plugin_enable, strip_id, plugin_id,
 		        strips ().strip_plugin_enabled (strip_id, plugin_id));
@@ -185,13 +210,19 @@ WebsocketsDispatcher::strip_plugin_enable_handler (Client client, const NodeStat
 void
 WebsocketsDispatcher::strip_plugin_param_value_handler (Client client, const NodeStateMessage& msg)
 {
-	uint32_t strip_id  = msg.state ().nth_addr (0);
-	uint32_t plugin_id = msg.state ().nth_addr (1);
-	uint32_t param_id  = msg.state ().nth_addr (2);
+	const NodeState& state = msg.state ();
 
-	if (msg.is_write ()) {
+	if (state.n_addr () < 3) {
+		return;
+	}
+
+	uint32_t strip_id  = state.nth_addr (0);
+	uint32_t plugin_id = state.nth_addr (1);
+	uint32_t param_id  = state.nth_addr (2);
+
+	if (msg.is_write () && (state.n_val () > 0)) {
 		strips ().set_strip_plugin_param_value (strip_id, plugin_id, param_id,
-		                                        msg.state ().nth_val (0));
+		                                        state.nth_val (0));
 	} else {
 		TypedValue value = strips ().strip_plugin_param_value (strip_id, plugin_id, param_id);
 		update (client, Node::strip_plugin_param_value, strip_id, plugin_id, param_id, value);
