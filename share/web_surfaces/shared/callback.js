@@ -30,16 +30,19 @@
 
 	// Globals
 	onTempo (bpm) {}
+	onPositionTime (seconds) {}
+	onTransportRoll (value) {}
+	onRecordState (value) {}
 
 	// Strips
-	onStripDesc (stripId, name) {}
+	onStripDescription (stripId, name) {}
 	onStripMeter (stripId, db) {}
 	onStripGain (stripId, db) {}
 	onStripPan (stripId, value) {}
 	onStripMute (stripId, value) {}
 
 	// Strip plugins
-	onStripPluginDesc (stripId, pluginId, name) {}
+	onStripPluginDescription (stripId, pluginId, name) {}
 	onStripPluginEnable (stripId, pluginId, value) {}
 
 	// Strip plugin parameters
@@ -47,7 +50,7 @@
 	//   'b' : boolean
 	//   'i' : integer
 	//   'd' : double
-	onStripPluginParamDesc (stripId, pluginId, paramId, name, valueType, min, max, isLog) {}
+	onStripPluginParamDescription (stripId, pluginId, paramId, name, valueType, min, max, isLog) {}
 	onStripPluginParamValue (stripId, pluginId, paramId, value) {}
 
 }

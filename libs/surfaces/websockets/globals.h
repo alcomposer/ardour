@@ -30,6 +30,14 @@ public:
 
 	double tempo () const;
 	void   set_tempo (double);
+
+	double position_time () const;
+
+	bool transport_roll () const;
+	void set_transport_roll (bool);
+
+	bool record_state () const;
+	void set_record_state (bool);
 };
 
 #endif // _ardour_surface_websockets_globals_h_
