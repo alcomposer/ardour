@@ -62,15 +62,31 @@ WebsocketsDispatcher::update_all_nodes (Client client)
 
 	for (uint32_t strip_n = 0; strip_n < strips ().strip_count (); ++strip_n) {
 		boost::shared_ptr<Stripable> strip = strips ().nth_strip (strip_n);
-		boost::shared_ptr<Route>     route = boost::dynamic_pointer_cast<Route> (strip);
+
+		bool is_vca = strip->presentation_info ().flags () & ARDOUR::PresentationInfo::VCA;
+
+		AddressVector strip_addr = AddressVector ();
+		strip_addr.push_back (strip_n);
+		ValueVector strip_desc = ValueVector ();
+		strip_desc.push_back (strip->name ());
+		strip_desc.push_back (is_vca);
+		
+		update (client, Node::strip_description, strip_addr, strip_desc);
+		
+		update (client, Node::strip_gain, strip_n, strips ().strip_gain (strip_n));
+		update (client, Node::strip_mute, strip_n, strips ().strip_mute (strip_n));
+
+		// Pan and plugins not available in VCAs
+		if (is_vca) {
+			continue;
+		}
+
+		boost::shared_ptr<Route> route = boost::dynamic_pointer_cast<Route> (strip);
 		if (!route) {
 			continue;
 		}
 
-		update (client, Node::strip_description, strip_n, strip->name ());
-		update (client, Node::strip_gain, strip_n, strips ().strip_gain (strip_n));
 		update (client, Node::strip_pan, strip_n, strips ().strip_pan (strip_n));
-		update (client, Node::strip_mute, strip_n, strips ().strip_mute (strip_n));
 
 		for (uint32_t plugin_n = 0;; ++plugin_n) {
 			boost::shared_ptr<PluginInsert> insert = strips ()
